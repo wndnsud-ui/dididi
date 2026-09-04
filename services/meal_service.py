@@ -1,34 +1,44 @@
 import random
 from datetime import datetime, timedelta
 
+import pandas as pd
 import streamlit as st
 
-from data.nutrition import NUTRITION_DB
+from data.nutrition_loader import get_nutrition_by_name, search_foods
 
 MEAL_SLOTS = {
-    "아침": ["apple_fuji", "sandwich_egg", "banana_standard", "broccoli_steamed", "cup_americano"],
-    "점심": ["bowl_bibimbap", "bowl_jeyuk", "bowl_kimchi_jjigae", "bowl_ramen", "sandwich_chicken"],
-    "저녁": ["pizza_pepperoni", "pizza_cheese", "pizza_combination", "salad_chicken", "bowl_jeyuk"],
-    "간식/야식": ["cake_piece", "donut_glazed", "cup_latte", "bottle_cola_zero", "banana_standard"],
+    "아침": ["사과", "샌드위치", "바나나", "브로콜리", "아메리카노"],
+    "점심": ["비빔밥", "제육", "김치찌개", "라면", "샌드위치"],
+    "저녁": ["피자", "샐러드", "제육", "비빔밥"],
+    "간식/야식": ["케이크", "도넛", "라떼", "콜라", "바나나"],
 }
 
 
-def build_meal_record(food_key, portion, meal_type, source="직접입력", recorded_at=None):
-    item = NUTRITION_DB[food_key]
+def safe_multiply(value, portion, decimals=1):
+    if value is None or pd.isna(value):
+        return None
+    return round(float(value) * portion, decimals)
+
+
+def build_meal_record(food_name, portion, meal_type, source="직접입력", recorded_at=None):
+    item = get_nutrition_by_name(food_name)
+    if item is None:
+        raise ValueError(f"CSV에서 음식을 찾을 수 없습니다: {food_name}")
+
     recorded_at = recorded_at or datetime.now()
     return {
         "데이터구분": source,
         "기록일시": recorded_at.strftime("%Y-%m-%d %H:%M"),
         "날짜": recorded_at.strftime("%Y-%m-%d"),
         "식사구분": meal_type,
-        "음식명": item["name"],
-        "섭취수량": f"{portion} {item['unit']}",
-        "칼로리(kcal)": round(item["cal"] * portion, 1),
-        "탄수화물(g)": round(item["carbs"] * portion, 1),
-        "단백질(g)": round(item["protein"] * portion, 1),
-        "지방(g)": round(item["fat"] * portion, 1),
-        "당류(g)": round(item["sugar"] * portion, 1),
-        "나트륨(mg)": int(item["sodium"] * portion),
+        "음식명": item["food_name"],
+        "섭취수량": f"{portion} {item['serving_basis']}",
+        "칼로리(kcal)": safe_multiply(item["calories"], portion),
+        "탄수화물(g)": safe_multiply(item["carbs"], portion),
+        "단백질(g)": safe_multiply(item["protein"], portion),
+        "지방(g)": safe_multiply(item["fat"], portion),
+        "당류(g)": safe_multiply(item["sugar"], portion),
+        "나트륨(mg)": safe_multiply(item["sodium"], portion),
     }
 
 
@@ -41,9 +51,13 @@ def generate_mock_meals(count=30):
         recorded_at = (datetime.now() - timedelta(days=random.randint(0, 6))).replace(
             hour=random.randint(start_hour, end_hour), minute=random.randint(10, 55)
         )
-        food_key = random.choice(MEAL_SLOTS[meal_type])
+        keyword = random.choice(MEAL_SLOTS[meal_type])
+        matches = search_foods(keyword, limit=20)
+        if not matches:
+            continue
+        food_name = random.choice(matches)
         portion = random.choice([0.5, 1.0, 1.0, 1.0, 1.5, 2.0])
-        records.append(build_meal_record(food_key, portion, meal_type, "가상생성", recorded_at))
+        records.append(build_meal_record(food_name, portion, meal_type, "가상생성", recorded_at))
     return sorted(records, key=lambda record: record["기록일시"], reverse=True)
 
 

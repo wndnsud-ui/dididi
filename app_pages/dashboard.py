@@ -11,6 +11,15 @@ def _highlight_real_data(row):
     return [""] * len(row)
 
 
+def _sum_known_values(series):
+    total = series.sum(min_count=1)
+    return None if pd.isna(total) else round(float(total), 1)
+
+
+def _format_metric(value, unit):
+    return "-" if value is None else f"{value:,} {unit}"
+
+
 def render_dashboard(daily_goal):
     st.title("📊 다이어트 영양 통계 대시보드")
     if not st.session_state.meal_history:
@@ -19,17 +28,17 @@ def render_dashboard(daily_goal):
 
     df = pd.DataFrame(st.session_state.meal_history)
     totals = {
-        "calories": round(df["칼로리(kcal)"].sum(), 1),
-        "carbs": round(df["탄수화물(g)"].sum(), 1),
-        "protein": round(df["단백질(g)"].sum(), 1),
-        "fat": round(df["지방(g)"].sum(), 1),
+        "calories": _sum_known_values(df["칼로리(kcal)"]),
+        "carbs": _sum_known_values(df["탄수화물(g)"]),
+        "protein": _sum_known_values(df["단백질(g)"]),
+        "fat": _sum_known_values(df["지방(g)"]),
     }
     st.markdown(f"### 📈 누적 식단 데이터 현황 (총 {len(df)}건)")
     columns = st.columns(4)
-    columns[0].metric("누적 섭취 칼로리", f"{totals['calories']:,} kcal")
-    columns[1].metric("누적 탄수화물", f"{totals['carbs']:,} g")
-    columns[2].metric("누적 단백질", f"{totals['protein']:,} g")
-    columns[3].metric("누적 지방", f"{totals['fat']:,} g")
+    columns[0].metric("누적 섭취 칼로리", _format_metric(totals["calories"], "kcal"))
+    columns[1].metric("누적 탄수화물", _format_metric(totals["carbs"], "g"))
+    columns[2].metric("누적 단백질", _format_metric(totals["protein"], "g"))
+    columns[3].metric("누적 지방", _format_metric(totals["fat"], "g"))
 
     st.divider()
     st.subheader("📅 최근 일자별 칼로리 섭취 추이")
@@ -53,16 +62,25 @@ def render_dashboard(daily_goal):
 
     with chart_columns[1]:
         st.subheader("⚖️ 전체 탄·단·지 칼로리 구성 비율")
+        macro_values = {
+            "탄수화물": (totals["carbs"], 4),
+            "단백질": (totals["protein"], 4),
+            "지방": (totals["fat"], 9),
+        }
         macro_data = pd.DataFrame({
-            "영양소": ["탄수화물", "단백질", "지방"],
-            "열량": [totals["carbs"] * 4, totals["protein"] * 4, totals["fat"] * 9],
+            "영양소": [name for name, (value, _) in macro_values.items() if value is not None],
+            "열량": [value * multiplier for value, multiplier in macro_values.values() if value is not None],
         })
-        macro_chart = px.pie(
-            macro_data, values="열량", names="영양소", hole=0.45, color="영양소",
-            color_discrete_map={"탄수화물": "#4CAF50", "단백질": "#2196F3", "지방": "#FF9800"},
-        )
-        macro_chart.update_layout(height=300, margin=dict(t=10, b=10, l=10, r=10))
-        st.plotly_chart(macro_chart, width="stretch")
+        if macro_data.empty:
+            st.info("탄·단·지 정보가 있는 기록이 없어 비율을 계산할 수 없습니다.")
+        else:
+            st.caption("영양성분 결측값은 탄·단·지 합산에서 제외했습니다.")
+            macro_chart = px.pie(
+                macro_data, values="열량", names="영양소", hole=0.45, color="영양소",
+                color_discrete_map={"탄수화물": "#4CAF50", "단백질": "#2196F3", "지방": "#FF9800"},
+            )
+            macro_chart.update_layout(height=300, margin=dict(t=10, b=10, l=10, r=10))
+            st.plotly_chart(macro_chart, width="stretch")
 
     st.divider()
     st.subheader("📋 전체 식사 히스토리 테이블")

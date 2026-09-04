@@ -1,13 +1,29 @@
 from pathlib import Path
 
 import streamlit as st
-from PIL import Image
+from PIL import Image, ImageDraw
 
-from data.nutrition import NUTRITION_DB, YOLO_TO_DETAIL_MAP
-from services.detector import detect_food
+from data.nutrition import YOLO_TO_DETAIL_MAP
+from data.nutrition_loader import get_nutrition_by_name, search_foods
+from services.detector import detect_foods
 from services.meal_service import add_meal_records, build_meal_record
 
 SAMPLE_DIR = Path("samples")
+
+
+def _draw_detections(image, detections):
+    annotated = image.copy()
+    draw = ImageDraw.Draw(annotated)
+    for detection in detections:
+        bbox = detection["bbox"]
+        coordinates = (bbox["x1"], bbox["y1"], bbox["x2"], bbox["y2"])
+        draw.rectangle(coordinates, outline="#00C853", width=4)
+        draw.text(
+            (bbox["x1"], max(0, bbox["y1"] - 18)),
+            f"{detection['label']} {detection['confidence']:.1f}%",
+            fill="#00C853",
+        )
+    return annotated
 
 
 def _load_images():
@@ -47,40 +63,65 @@ def _load_images():
 
 def _render_food_card(index, total, image_title, image, meal_slot):
     with st.expander(f"📷 [{index + 1}/{total}] {image_title}", expanded=True):
+        detections = detect_foods(image)
         image_column, info_column = st.columns([1, 1.5], gap="medium")
         with image_column:
-            st.image(image, width="stretch")
+            st.image(_draw_detections(image, detections), width="stretch")
+            if detections:
+                st.caption("초록색 박스는 YOLO가 탐지한 객체의 위치입니다.")
         with info_column:
-            detected_label, confidence = detect_food(image)
-            if detected_label:
-                st.success(f"AI 인식: **{detected_label}** ({confidence:.1f}%)")
-                options = YOLO_TO_DETAIL_MAP[detected_label]
-                label = f"상세 메뉴 확인/변경 (사진 {index + 1})"
+            if detections:
+                detected_labels = ", ".join(sorted({detection["label"] for detection in detections}))
+                confidence_text = ", ".join(
+                    f"{detection['confidence']:.1f}%" for detection in detections
+                )
+                st.success(
+                    f"AI 인식 {len(detections)}개: **{detected_labels}** "
+                    f"({confidence_text})"
+                )
+                suggested_keywords = [YOLO_TO_DETAIL_MAP[detection["label"]] for detection in detections]
+                suggested_keyword = next(
+                    (keyword for keyword in suggested_keywords if keyword), ""
+                )
             else:
                 st.warning("⚠️ 음식 자동 감지 실패 (수동 선택)")
-                options = list(NUTRITION_DB)
-                label = f"메뉴 수동 선택 (사진 {index + 1})"
+                suggested_keyword = ""
 
-            food_key = st.selectbox(
-                label,
-                options=options,
-                format_func=lambda key: f"{NUTRITION_DB[key]['name']} ({NUTRITION_DB[key]['category']})",
-                key=f"menu_{index}",
+            keyword = st.text_input(
+                f"음식 검색 (사진 {index + 1})",
+                value=suggested_keyword,
+                key=f"keyword_{index}",
             )
-            item = NUTRITION_DB[food_key]
+            options = search_foods(keyword, limit=20)
+            if not options:
+                st.info("음식명을 입력하면 최대 20개의 후보가 표시됩니다.")
+                return None
+
+            food_name = st.selectbox(
+                f"상세 음식 선택 (사진 {index + 1})",
+                options=options,
+                key=f"food_{index}",
+            )
+            item = get_nutrition_by_name(food_name)
             portion = st.number_input(
-                f"섭취 수량 ({item['unit']})",
+                f"섭취 수량 ({item['serving_basis']})",
                 min_value=0.5,
                 max_value=5.0,
                 value=1.0,
                 step=0.5,
                 key=f"portion_{index}",
             )
-            record = build_meal_record(food_key, portion, meal_slot)
+            record = build_meal_record(food_name, portion, meal_slot)
+
+            def display_value(value, unit):
+                return f"정보 없음" if value is None else f"{value}{unit}"
+
             st.caption(
-                f"🔥 **{record['칼로리(kcal)']} kcal** | 탄수화물 {record['탄수화물(g)']}g | "
-                f"단백질 {record['단백질(g)']}g | 지방 {record['지방(g)']}g | "
-                f"나트륨 {record['나트륨(mg)']}mg"
+                f"🔥 **{display_value(record['칼로리(kcal)'], ' kcal')}** | "
+                f"탄수화물 {display_value(record['탄수화물(g)'], 'g')} | "
+                f"단백질 {display_value(record['단백질(g)'], 'g')} | "
+                f"지방 {display_value(record['지방(g)'], 'g')} | "
+                f"나트륨 {display_value(record['나트륨(mg)'], 'mg')}"
             )
             return record
 
@@ -108,6 +149,9 @@ def render_meal_analysis():
         _render_food_card(index, len(images), title, image, meal_slot)
         for index, (title, image) in enumerate(images)
     ]
+    records = [record for record in records if record is not None]
+    if not records:
+        return
     st.divider()
     total_calories = sum(record["칼로리(kcal)"] for record in records)
     label = f"🚀 위 {len(records)}개 음식 일괄 등록하기 (총 {total_calories:,.1f} kcal)"
