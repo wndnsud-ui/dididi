@@ -1,0 +1,17 @@
+CaloDetect 바로 실행 안내
+=========================
+
+[Windows]
+1. 이 폴더를 원하는 위치에 압축 해제
+2. 01_SETUP_AND_RUN.bat 더블클릭
+3. 설치가 끝나면 Streamlit 앱 자동 실행
+4. 다음부터는 02_RUN_ONLY.bat 더블클릭
+
+브라우저 주소:
+http://localhost:8501
+
+시연용 사진:
+samples 폴더 안에 jpg/png 파일을 넣으면 됩니다.
+
+주의:
+최초 실행은 Python 패키지와 yolov8n.pt 다운로드 때문에 인터넷이 필요합니다.
