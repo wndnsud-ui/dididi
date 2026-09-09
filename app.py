@@ -1,12 +1,11 @@
 import os
 import random
 from datetime import datetime, timedelta
+import yaml
 import streamlit as st
 import pandas as pd
 import plotly.express as px
 from PIL import Image, ImageDraw
-import torch
-from torchvision.ops import nms
 from ultralytics import YOLO
 
 # ==============================================================================
@@ -18,43 +17,11 @@ st.set_page_config(
     layout="wide"
 )
 
-# ==============================================================================
-# [2] 라벨 번역 맵 및 영양 데이터베이스
-# ==============================================================================
-# 55종 모델(best1.pt)의 영문 라벨 -> 한글 변환 매핑
-BEST1_KO_MAP = {
-    "Braised lotus roots": "연근조림", "Dongchimi": "동치미", "Japchae": "잡채",
-    "Kimchi stew": "김치찌개", "Kimchi": "배추김치", "Korean rib": "갈비구이",
-    "Korean style raw beef": "육회", "Seasoned bean sprouts": "콩나물무침",
-    "Udon": "우동", "baek Kimchi": "백김치", "banquet noodles": "잔치국수",
-    "bean sprout soup": "콩나물국", "beef-bone soup": "곰탕_설렁탕",
-    "bellflower greens": "도라지무침", "bibimbap": "비빔밥",
-    "boiled fish paste soup": "어묵탕", "budaejjigae": "부대찌개",
-    "bulgogi": "불고기", "chonggak Kimchi": "총각김치", "cucumber kimchi": "오이소박이",
-    "cup rice": "컵밥", "dried pollack soup": "북엇국", "eel": "장어구이",
-    "fried rice": "볶음밥", "green onion Kimchi": "파김치", "grilled mackerel": "고등어구이",
-    "janjorim": "장조림", "jeyuk bokkeum": "제육볶음", "memil soba": "메밀소바",
-    "miso soup": "된장찌개", "mixed rice": "잡곡밥", "nabak Kimchi": "나박김치",
-    "naengMyeon": "물냉면", "pickled sesame leaf": "깻잎장아찌", "pig hocks": "족발",
-    "pork belly": "삼겹살", "radish Kimchi": "깍두기", "radish kimchi": "깍두기",
-    "rice ball": "주먹밥", "rice roll": "김밥", "rice": "쌀밥",
-    "seasoned bean sprouts": "숙주나물", "seasoned bellflower root": "도라지무침",
-    "seasoned bracken": "고사리나물", "seasoned zucchini": "애호박볶음",
-    "seaweed soup": "미역국", "seaweed": "미역줄기볶음", "shellfish soup": "조개탕",
-    "spicy yuke jang": "육개장", "spinach greens": "시금치나물", "stewed mackerel": "고등어조림",
-    "stir-fried anchovies": "멸치볶음", "young radish Kimchi": "열무김치"
-}
-
-# 기본 모델(yolov8n.pt)의 과일/간식류 영문 라벨 -> 한글 변환 매핑
-COCO_KO_MAP = {
-    "sandwich": "샌드위치", "hot dog": "핫도그", "apple": "사과",
-    "banana": "바나나", "orange": "오렌지", "broccoli": "데친 브로콜리",
-    "carrot": "당근", "donut": "도넛", "cake": "조각 케이크"
-}
-
-# 150종 한식 + 과일/양식 표준 1인분 영양 데이터베이스
+# ============================================================================== 
+# [2] 5차 59종 영양 데이터베이스
+# ============================================================================== 
 NUTRITION_DB = {
-    # 과일/간식류 (COCO 보충)
+    # 과일/간식류
     "샌드위치": {"category": "간편식", "unit": "개", "cal": 380, "carbs": 42.0, "protein": 16.0, "fat": 15.0, "sugar": 5.0, "sodium": 750},
     "핫도그": {"category": "간편식", "unit": "개", "cal": 290, "carbs": 26.0, "protein": 10.0, "fat": 16.0, "sugar": 4.0, "sodium": 680},
     "사과": {"category": "과일", "unit": "개", "cal": 105, "carbs": 27.5, "protein": 0.6, "fat": 0.3, "sugar": 21.0, "sodium": 2},
@@ -214,102 +181,62 @@ NUTRITION_DB = {
     "식혜": {"category": "음료", "unit": "캔/잔", "cal": 120, "carbs": 29.0, "protein": 0.5, "fat": 0.1, "sugar": 24.0, "sodium": 15}
 }
 
-# ==============================================================================
-# [3] 3중 앙상블 모델 로드 및 추론
-# ==============================================================================
+# ===============================================================================
+# [3] 5차 단일 모델 로드 및 추론
+# ===============================================================================
 @st.cache_resource
-def load_triple_ensemble_models():
-    # 1. 150종 한식 모델 (Small)
-    m_150 = YOLO("best.pt") if os.path.exists("best.pt") else YOLO("yolov8s.pt")
-    # 2. 55종 한식 모델 (Nano)
-    m_55 = YOLO("best1.pt") if os.path.exists("best1.pt") else None
-    # 3. 기본 COCO 80종 모델 (과일/간식 보조용)
-    m_base = YOLO("yolov8n.pt")
-    return m_150, m_55, m_base
+def load_5th_model():
+    model_path = "best.pt"
+    data_path = "5차data.yaml"
 
-def run_triple_ensemble(image, conf_val=0.08, iou_val=0.45, imgsz_val=960):
-    m_150, m_55, m_base = load_triple_ensemble_models()
+    if not os.path.exists(model_path):
+        raise FileNotFoundError(f"필수 모델 파일이 없습니다: {model_path}")
+    if not os.path.exists(data_path):
+        raise FileNotFoundError(f"필수 데이터 설정 파일이 없습니다: {data_path}")
+
+    with open(data_path, "r", encoding="utf-8") as yaml_file:
+        data_config = yaml.safe_load(yaml_file)
+
+    yaml_names = data_config["names"]
+    if isinstance(yaml_names, dict):
+        yaml_names = [yaml_names[index] for index in range(data_config["nc"])]
+
+    if len(yaml_names) != data_config["nc"]:
+        raise ValueError("5차data.yaml의 nc와 names 개수가 다릅니다.")
+
+    model = YOLO(model_path)
+    model_names = [model.names[index] for index in range(len(model.names))]
+    if model_names != yaml_names:
+        raise ValueError("5차best.pt의 클래스 순서 또는 이름이 5차data.yaml과 다릅니다.")
+
+    return model, yaml_names
+
+def run_5th_model(image, conf_val=0.08, iou_val=0.45, imgsz_val=960):
+    model, class_names = load_5th_model()
     
-    # 세 모델을 고해상도로 각각 추론
-    res_150 = m_150(image, conf=conf_val, imgsz=imgsz_val, verbose=False)[0]
-    res_base = m_base(image, conf=conf_val, imgsz=imgsz_val, verbose=False)[0]
-    res_55 = m_55(image, conf=conf_val, imgsz=imgsz_val, verbose=False)[0] if m_55 else None
-
-    all_boxes, all_scores, all_meta = [], [], []
-
-    # [1] 150종 한식 모델 결과 (최우선 가중치 +1.0)
-    for box in res_150.boxes:
-        cls_id = int(box.cls[0])
-        name = m_150.names[cls_id]
-        conf = float(box.conf[0])
-        xyxy = box.xyxy[0].tolist()
-        all_boxes.append(xyxy)
-        all_scores.append(conf + 1.0)
-        all_meta.append({
-            "name": name,
-            "conf": conf * 100,
-            "box": xyxy,
-            "source": "한식150(best)"
-        })
-
-    # [2] 55종 한식 모델 결과 (중간 가중치 +0.5)
-    if res_55:
-        for box in res_55.boxes:
-            cls_id = int(box.cls[0])
-            en_name = m_55.names[cls_id]
-            if en_name in BEST1_KO_MAP:
-                ko_name = BEST1_KO_MAP[en_name]
-                conf = float(box.conf[0])
-                xyxy = box.xyxy[0].tolist()
-                all_boxes.append(xyxy)
-                all_scores.append(conf + 0.5)
-                all_meta.append({
-                    "name": ko_name,
-                    "conf": conf * 100,
-                    "box": xyxy,
-                    "source": "한식55(best1)"
-                })
-
-    # [3] COCO 모델 (과일/간식 필터링)
-    for box in res_base.boxes:
-        cls_id = int(box.cls[0])
-        en_name = m_base.names[cls_id]
-        if en_name in COCO_KO_MAP:
-            ko_name = COCO_KO_MAP[en_name]
-            conf = float(box.conf[0])
-            xyxy = box.xyxy[0].tolist()
-            all_boxes.append(xyxy)
-            all_scores.append(conf)
-            all_meta.append({
-                "name": ko_name,
-                "conf": conf * 100,
-                "box": xyxy,
-                "source": "일반(yolov8n)"
-            })
-
+    result = model(image, conf=conf_val, iou=iou_val, imgsz=imgsz_val, verbose=False)[0]
     detected_items = []
     annotated_img = image.copy()
     draw = ImageDraw.Draw(annotated_img)
 
-    if all_boxes:
-        b_tensor = torch.tensor(all_boxes, dtype=torch.float32)
-        s_tensor = torch.tensor(all_scores, dtype=torch.float32)
-        # NMS로 중복 영역 제거 (가장 신뢰도/가중치가 높은 모델 결과 우선 보존)
-        keep = nms(b_tensor, s_tensor, iou_val).tolist()
-
+    for box in result.boxes:
+        cls_id = int(box.cls[0])
+        name = class_names[cls_id]
+        conf = float(box.conf[0])
+        xyxy = box.xyxy[0].tolist()
+        x1, y1, x2, y2 = map(int, xyxy)
         w, h = image.size
-        for idx in keep:
-            item = all_meta[idx]
-            x1, y1, x2, y2 = map(int, item["box"])
-            crop_box = (max(0, x1), max(0, y1), min(w, x2), min(h, y2))
-            crop_img = image.crop(crop_box) if crop_box[2] > crop_box[0] and crop_box[3] > crop_box[1] else None
-            item["crop"] = crop_img
-            detected_items.append(item)
-
-            # 박스 색상 구분 (150종: 초록, 55종: 주황, COCO: 파랑)
-            color = "#28a745" if "150" in item["source"] else ("#ffc107" if "55" in item["source"] else "#17a2b8")
-            draw.rectangle([x1, y1, x2, y2], outline=color, width=3)
-            draw.text((x1 + 4, max(0, y1 - 16)), f"{item['name']} ({item['conf']:.0f}%)", fill=color)
+        crop_box = (max(0, x1), max(0, y1), min(w, x2), min(h, y2))
+        crop_img = image.crop(crop_box) if crop_box[2] > crop_box[0] and crop_box[3] > crop_box[1] else None
+        detected_items.append({
+            "name": name,
+            "conf": conf * 100,
+            "box": xyxy,
+            "source": "한식59(5차best)",
+            "crop": crop_img
+        })
+        draw.rectangle([x1, y1, x2, y2], outline="#28a745", width=3)
+        draw.text((x1 + 4, max(0, y1 - 16)), f"{name} ({conf * 100:.0f}%)", fill="#28a745")
 
     return detected_items, annotated_img
 
@@ -365,7 +292,7 @@ st.sidebar.title("📌 네비게이션")
 view_mode = st.sidebar.radio("화면 모드", ["📷 음식 사진 분석 및 추가", "📊 종합 통계 대시보드"])
 
 st.sidebar.write("---")
-st.sidebar.subheader("⚙️ AI 3중 앙상블 탐지 설정")
+st.sidebar.subheader("⚙️ AI 5차 모델 탐지 설정")
 conf_threshold = st.sidebar.slider("AI 감지 신뢰도(Conf) 기준", 0.01, 0.40, 0.08, 0.01, help="낮출수록 더 많은 음식을 민감하게 찾아냅니다.")
 iou_threshold = st.sidebar.slider("중복 제거(IoU) 기준", 0.20, 0.70, 0.45, 0.05, help="인접한 반찬이 지워지지 않도록 조정합니다.")
 imgsz_choice = st.sidebar.select_slider("분석 해상도(imgsz)", options=[640, 800, 960, 1024, 1280], value=960, help="해상도가 클수록 작은 반찬을 선명하게 감지합니다.")
@@ -389,11 +316,11 @@ if st.sidebar.button("🗑️ 전체 데이터 비우기"):
 daily_goal = st.sidebar.number_input("🎯 1일 목표 칼로리 (kcal)", 1200, 3500, 2000, 100)
 
 # ==============================================================================
-# [6] 화면 1: 다중 사진 분석 및 3중 앙상블 음식 감지
+# [6] 화면 1: 다중 사진 분석 및 5차 모델 음식 감지
 # ==============================================================================
 if view_mode == "📷 음식 사진 분석 및 추가":
-    st.title("📷 AI 3중 앙상블 다중 음식 감지 & 식단 등록")
-    st.caption("🟢 초록색: 150종 한식 / 🟡 노란색: 55종 한식 / 🔵 파란색: 일반 과일·양식 모델")
+    st.title("📷 AI 5차 모델 다중 음식 감지 & 식단 등록")
+    st.caption("🟢 초록색: 5차 59종 한식 / 🔵 파란색: 일반 과일·양식 모델")
 
     if st.session_state.last_added_message:
         st.success(st.session_state.last_added_message)
@@ -431,8 +358,8 @@ if view_mode == "📷 음식 사진 분석 및 추가":
         for img_idx, (img_title, img_obj) in enumerate(images_to_process):
             st.markdown(f"### 🖼️ [사진 {img_idx+1}] {img_title}")
             
-            # 3중 앙상블 추론 실행
-            detected_items, annotated_img = run_triple_ensemble(
+            # 5차 모델 기반 추론 실행
+            detected_items, annotated_img = run_5th_model(
                 img_obj,
                 conf_val=conf_threshold,
                 iou_val=iou_threshold,
@@ -442,7 +369,7 @@ if view_mode == "📷 음식 사진 분석 및 추가":
             # 1단계: 1차 탐색 결과 브리핑
             col_img, col_summary = st.columns([1.3, 1], gap="medium")
             with col_img:
-                st.image(annotated_img, caption="🎯 AI 3중 앙상블 객체 탐색 결과", use_container_width=True)
+                st.image(annotated_img, caption="🎯 AI 5차 모델 객체 탐색 결과", use_container_width=True)
             with col_summary:
                 st.markdown("#### 🔍 1차 탐색 요약")
                 if not detected_items:
