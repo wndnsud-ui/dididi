@@ -17,173 +17,57 @@ st.set_page_config(
     layout="wide"
 )
 
+# ==============================================================================
+# ==============================================================================
+# [3] CSV 영양 데이터 로드
+# ==============================================================================
+@st.cache_data
+def load_nutrition_db(csv_path, csv_modified_time):
+    required_columns = {"food_name", "category", "unit", "cal", "carbs", "protein", "fat", "sugar", "sodium"}
+
+    if not os.path.exists(csv_path):
+        raise FileNotFoundError(f"영양 데이터 CSV 파일이 없습니다: {csv_path}")
+
+    nutrition_df = pd.read_csv(csv_path, encoding="utf-8-sig")
+    missing_columns = required_columns - set(nutrition_df.columns)
+    if missing_columns:
+        raise ValueError(f"영양 데이터 CSV에 필요한 컬럼이 없습니다: {sorted(missing_columns)}")
+
+    nutrition_df = nutrition_df.copy()
+    nutrition_df["food_name"] = nutrition_df["food_name"].astype(str).str.strip()
+    nutrition_df = nutrition_df[nutrition_df["food_name"] != ""]
+
+    numeric_columns = ["cal", "carbs", "protein", "fat", "sugar", "sodium"]
+    for column in numeric_columns:
+        nutrition_df[column] = pd.to_numeric(nutrition_df[column], errors="coerce").fillna(0.0)
+
+    return {
+        row["food_name"]: {
+            "category": row["category"],
+            "unit": row["unit"],
+            "cal": row["cal"],
+            "carbs": row["carbs"],
+            "protein": row["protein"],
+            "fat": row["fat"],
+            "sugar": row["sugar"],
+            "sodium": row["sodium"]
+        }
+        for _, row in nutrition_df.iterrows()
+    }
+
+
+NUTRITION_CSV_PATH = os.path.join(os.path.dirname(__file__), "CaloDetect_nutrition_all_matched.csv")
+if not os.path.exists(NUTRITION_CSV_PATH):
+    raise FileNotFoundError(f"영양 데이터 CSV 파일이 없습니다: {NUTRITION_CSV_PATH}")
+
+NUTRITION_DB = load_nutrition_db(
+    NUTRITION_CSV_PATH,
+    os.path.getmtime(NUTRITION_CSV_PATH)
+)
+
 # ============================================================================== 
-# [2] 5차 59종 영양 데이터베이스
+# [4] 5차 단일 모델 로드 및 추론
 # ============================================================================== 
-NUTRITION_DB = {
-    # 과일/간식류
-    "샌드위치": {"category": "간편식", "unit": "개", "cal": 380, "carbs": 42.0, "protein": 16.0, "fat": 15.0, "sugar": 5.0, "sodium": 750},
-    "핫도그": {"category": "간편식", "unit": "개", "cal": 290, "carbs": 26.0, "protein": 10.0, "fat": 16.0, "sugar": 4.0, "sodium": 680},
-    "사과": {"category": "과일", "unit": "개", "cal": 105, "carbs": 27.5, "protein": 0.6, "fat": 0.3, "sugar": 21.0, "sodium": 2},
-    "바나나": {"category": "과일", "unit": "개", "cal": 105, "carbs": 27.0, "protein": 1.3, "fat": 0.3, "sugar": 14.4, "sodium": 1},
-    "오렌지": {"category": "과일", "unit": "개", "cal": 62, "carbs": 15.0, "protein": 1.2, "fat": 0.2, "sugar": 12.0, "sodium": 0},
-    "데친 브로콜리": {"category": "채소", "unit": "접시", "cal": 35, "carbs": 6.8, "protein": 2.8, "fat": 0.4, "sugar": 1.4, "sodium": 33},
-    "당근": {"category": "채소", "unit": "개", "cal": 35, "carbs": 8.0, "protein": 0.9, "fat": 0.2, "sugar": 4.5, "sodium": 60},
-    "도넛": {"category": "디저트", "unit": "개", "cal": 250, "carbs": 30.0, "protein": 3.0, "fat": 14.0, "sugar": 15.0, "sodium": 190},
-    "조각 케이크": {"category": "디저트", "unit": "조각", "cal": 350, "carbs": 45.0, "protein": 4.0, "fat": 18.0, "sugar": 28.0, "sodium": 220},
-
-    # 밥/죽류
-    "쌀밥": {"category": "밥류", "unit": "공기", "cal": 300, "carbs": 68.0, "protein": 5.5, "fat": 0.7, "sugar": 0.1, "sodium": 5},
-    "잡곡밥": {"category": "밥류", "unit": "공기", "cal": 320, "carbs": 66.0, "protein": 7.0, "fat": 1.5, "sugar": 0.2, "sodium": 6},
-    "김밥": {"category": "밥류", "unit": "줄", "cal": 400, "carbs": 65.0, "protein": 12.0, "fat": 9.0, "sugar": 2.5, "sodium": 850},
-    "김치볶음밥": {"category": "밥류", "unit": "인분", "cal": 570, "carbs": 80.0, "protein": 13.0, "fat": 18.0, "sugar": 3.2, "sodium": 980},
-    "비빔밥": {"category": "밥류", "unit": "그릇", "cal": 580, "carbs": 95.0, "protein": 18.0, "fat": 14.0, "sugar": 7.0, "sodium": 920},
-    "새우볶음밥": {"category": "밥류", "unit": "인분", "cal": 550, "carbs": 78.0, "protein": 15.0, "fat": 17.0, "sugar": 2.5, "sodium": 820},
-    "알밥": {"category": "밥류", "unit": "뚝배기", "cal": 490, "carbs": 74.0, "protein": 14.0, "fat": 12.0, "sugar": 3.0, "sodium": 760},
-    "유부초밥": {"category": "밥류", "unit": "인분", "cal": 380, "carbs": 64.0, "protein": 11.0, "fat": 8.0, "sugar": 9.0, "sodium": 650},
-    "주먹밥": {"category": "밥류", "unit": "개", "cal": 210, "carbs": 42.0, "protein": 4.5, "fat": 2.0, "sugar": 0.5, "sodium": 380},
-    "누룽지": {"category": "밥류", "unit": "그릇", "cal": 220, "carbs": 50.0, "protein": 3.5, "fat": 0.5, "sugar": 0.0, "sodium": 10},
-    "전복죽": {"category": "죽류", "unit": "대접", "cal": 280, "carbs": 52.0, "protein": 11.0, "fat": 2.5, "sugar": 0.8, "sodium": 590},
-    "호박죽": {"category": "죽류", "unit": "대접", "cal": 210, "carbs": 48.0, "protein": 3.0, "fat": 0.6, "sugar": 14.0, "sodium": 420},
-
-    # 국/탕/찌개류
-    "계란국": {"category": "국류", "unit": "대접", "cal": 95, "carbs": 3.0, "protein": 8.0, "fat": 5.5, "sugar": 0.8, "sodium": 720},
-    "곰탕_설렁탕": {"category": "탕류", "unit": "뚝배기", "cal": 320, "carbs": 6.0, "protein": 34.0, "fat": 16.0, "sugar": 0.1, "sodium": 650},
-    "김치찌개": {"category": "찌개류", "unit": "인분", "cal": 210, "carbs": 12.0, "protein": 15.0, "fat": 11.0, "sugar": 3.5, "sodium": 1450},
-    "김치찜": {"category": "찜류", "unit": "인분", "cal": 350, "carbs": 14.0, "protein": 28.0, "fat": 20.0, "sugar": 5.5, "sodium": 1550},
-    "닭계장": {"category": "국류", "unit": "대접", "cal": 310, "carbs": 10.0, "protein": 26.0, "fat": 18.0, "sugar": 2.5, "sodium": 1450},
-    "동태찌개": {"category": "찌개류", "unit": "인분", "cal": 230, "carbs": 8.0, "protein": 32.0, "fat": 6.0, "sugar": 2.0, "sodium": 1350},
-    "된장찌개": {"category": "찌개류", "unit": "뚝배기", "cal": 150, "carbs": 11.0, "protein": 12.0, "fat": 5.5, "sugar": 2.5, "sodium": 1280},
-    "떡국_만두국": {"category": "국류", "unit": "그릇", "cal": 490, "carbs": 82.0, "protein": 16.0, "fat": 10.0, "sugar": 2.0, "sodium": 1450},
-    "매운탕": {"category": "탕류", "unit": "대접", "cal": 260, "carbs": 10.0, "protein": 34.0, "fat": 8.0, "sugar": 3.0, "sodium": 1520},
-    "무국": {"category": "국류", "unit": "대접", "cal": 85, "carbs": 5.0, "protein": 8.0, "fat": 3.5, "sugar": 1.5, "sodium": 780},
-    "미역국": {"category": "국류", "unit": "대접", "cal": 80, "carbs": 6.0, "protein": 5.0, "fat": 4.0, "sugar": 0.5, "sodium": 750},
-    "북엇국": {"category": "국류", "unit": "대접", "cal": 120, "carbs": 5.0, "protein": 18.0, "fat": 2.5, "sugar": 0.2, "sodium": 950},
-    "순두부찌개": {"category": "찌개류", "unit": "뚝배기", "cal": 230, "carbs": 8.0, "protein": 17.0, "fat": 14.0, "sugar": 2.2, "sodium": 1220},
-    "시래기국": {"category": "국류", "unit": "대접", "cal": 95, "carbs": 9.0, "protein": 6.0, "fat": 3.5, "sugar": 1.2, "sodium": 980},
-    "육개장": {"category": "탕류", "unit": "대접", "cal": 350, "carbs": 14.0, "protein": 24.0, "fat": 21.0, "sugar": 3.0, "sodium": 1650},
-    "추어탕": {"category": "탕류", "unit": "뚝배기", "cal": 280, "carbs": 12.0, "protein": 22.0, "fat": 14.0, "sugar": 1.8, "sodium": 1150},
-    "콩나물국": {"category": "국류", "unit": "대접", "cal": 45, "carbs": 4.0, "protein": 4.0, "fat": 1.5, "sugar": 0.3, "sodium": 850},
-    "갈비탕": {"category": "탕류", "unit": "뚝배기", "cal": 450, "carbs": 8.0, "protein": 42.0, "fat": 26.0, "sugar": 0.5, "sodium": 950},
-    "감자탕": {"category": "탕류", "unit": "뚝배기", "cal": 520, "carbs": 18.0, "protein": 45.0, "fat": 28.0, "sugar": 3.0, "sodium": 1750},
-    "곱창전골": {"category": "전골류", "unit": "인분", "cal": 540, "carbs": 16.0, "protein": 32.0, "fat": 38.0, "sugar": 4.0, "sodium": 1620},
-    "삼계탕": {"category": "탕류", "unit": "뚝배기", "cal": 920, "carbs": 45.0, "protein": 78.0, "fat": 38.0, "sugar": 1.0, "sodium": 1100},
-
-    # 고기/구이/볶음/조림류
-    "갈비구이": {"category": "육류", "unit": "인분", "cal": 520, "carbs": 12.0, "protein": 38.0, "fat": 35.0, "sugar": 8.0, "sodium": 720},
-    "갈비찜": {"category": "육류", "unit": "인분", "cal": 580, "carbs": 16.0, "protein": 42.0, "fat": 38.0, "sugar": 10.0, "sodium": 880},
-    "곱창구이": {"category": "육류", "unit": "인분", "cal": 590, "carbs": 4.0, "protein": 28.0, "fat": 50.0, "sugar": 1.0, "sodium": 520},
-    "닭갈비": {"category": "육류", "unit": "인분", "cal": 560, "carbs": 24.0, "protein": 44.0, "fat": 30.0, "sugar": 9.0, "sodium": 1150},
-    "닭볶음탕": {"category": "육류", "unit": "인분", "cal": 540, "carbs": 26.0, "protein": 48.0, "fat": 24.0, "sugar": 8.0, "sodium": 1280},
-    "떡갈비": {"category": "육류", "unit": "인분", "cal": 420, "carbs": 14.0, "protein": 28.0, "fat": 26.0, "sugar": 7.0, "sodium": 680},
-    "보쌈": {"category": "육류", "unit": "인분", "cal": 540, "carbs": 2.0, "protein": 42.0, "fat": 39.0, "sugar": 1.0, "sodium": 480},
-    "불고기": {"category": "육류", "unit": "인분", "cal": 380, "carbs": 18.0, "protein": 30.0, "fat": 20.0, "sugar": 9.0, "sodium": 790},
-    "삼겹살": {"category": "육류", "unit": "인분", "cal": 650, "carbs": 0.0, "protein": 35.0, "fat": 56.0, "sugar": 0.0, "sodium": 120},
-    "수육": {"category": "육류", "unit": "인분", "cal": 510, "carbs": 1.0, "protein": 40.0, "fat": 37.0, "sugar": 0.5, "sodium": 390},
-    "양념치킨": {"category": "육류", "unit": "조각(2개)", "cal": 580, "carbs": 38.0, "protein": 32.0, "fat": 31.0, "sugar": 16.0, "sodium": 920},
-    "육회": {"category": "육류", "unit": "접시", "cal": 240, "carbs": 8.0, "protein": 28.0, "fat": 10.0, "sugar": 6.0, "sodium": 520},
-    "제육볶음": {"category": "육류", "unit": "접시", "cal": 450, "carbs": 15.0, "protein": 32.0, "fat": 28.0, "sugar": 8.0, "sodium": 880},
-    "족발": {"category": "육류", "unit": "인분", "cal": 550, "carbs": 4.0, "protein": 48.0, "fat": 37.0, "sugar": 2.0, "sodium": 650},
-    "찜닭": {"category": "육류", "unit": "인분", "cal": 520, "carbs": 32.0, "protein": 46.0, "fat": 20.0, "sugar": 12.0, "sodium": 1350},
-    "편육": {"category": "육류", "unit": "접시", "cal": 310, "carbs": 1.0, "protein": 26.0, "fat": 21.0, "sugar": 0.2, "sodium": 340},
-    "후라이드치킨": {"category": "육류", "unit": "조각(2개)", "cal": 520, "carbs": 20.0, "protein": 35.0, "fat": 32.0, "sugar": 1.0, "sodium": 680},
-    "훈제오리": {"category": "육류", "unit": "인분", "cal": 480, "carbs": 2.0, "protein": 32.0, "fat": 36.0, "sugar": 1.5, "sodium": 650},
-
-    # 생선/해물류
-    "갈치구이": {"category": "생선구이", "unit": "토막", "cal": 250, "carbs": 0.0, "protein": 30.0, "fat": 13.0, "sugar": 0.0, "sodium": 420},
-    "갈치조림": {"category": "생선조림", "unit": "토막", "cal": 290, "carbs": 11.0, "protein": 28.0, "fat": 14.0, "sugar": 5.0, "sodium": 920},
-    "고등어구이": {"category": "생선구이", "unit": "토막", "cal": 310, "carbs": 0.0, "protein": 29.0, "fat": 21.0, "sugar": 0.0, "sodium": 480},
-    "고등어조림": {"category": "생선조림", "unit": "토막", "cal": 280, "carbs": 10.0, "protein": 26.0, "fat": 14.0, "sugar": 5.0, "sodium": 890},
-    "꽁치조림": {"category": "생선조림", "unit": "토막", "cal": 270, "carbs": 9.0, "protein": 24.0, "fat": 15.0, "sugar": 4.5, "sodium": 850},
-    "장어구이": {"category": "생선구이", "unit": "마리", "cal": 420, "carbs": 8.0, "protein": 36.0, "fat": 27.0, "sugar": 6.0, "sodium": 580},
-    "조기구이": {"category": "생선구이", "unit": "마리", "cal": 210, "carbs": 0.0, "protein": 26.0, "fat": 11.0, "sugar": 0.0, "sodium": 440},
-    "간장게장": {"category": "절임류", "unit": "마리", "cal": 180, "carbs": 10.0, "protein": 24.0, "fat": 4.0, "sugar": 5.0, "sodium": 1890},
-    "양념게장": {"category": "무침류", "unit": "접시", "cal": 220, "carbs": 16.0, "protein": 22.0, "fat": 6.0, "sugar": 9.0, "sodium": 1720},
-    "꼬막찜": {"category": "해물찜", "unit": "접시", "cal": 130, "carbs": 4.0, "protein": 18.0, "fat": 3.0, "sugar": 1.0, "sodium": 680},
-    "주꾸미볶음": {"category": "볶음류", "unit": "접시", "cal": 260, "carbs": 16.0, "protein": 28.0, "fat": 8.0, "sugar": 7.0, "sodium": 1050},
-    "해물찜": {"category": "찜류", "unit": "인분", "cal": 380, "carbs": 24.0, "protein": 42.0, "fat": 11.0, "sugar": 6.0, "sodium": 1550},
-    "황태구이": {"category": "구이류", "unit": "마리", "cal": 260, "carbs": 12.0, "protein": 38.0, "fat": 4.0, "sugar": 6.0, "sodium": 820},
-
-    # 반찬/나물/김치/계란
-    "배추김치": {"category": "김치류", "unit": "접시", "cal": 14, "carbs": 2.4, "protein": 1.1, "fat": 0.3, "sugar": 1.0, "sodium": 420},
-    "깍두기": {"category": "김치류", "unit": "접시", "cal": 16, "carbs": 3.0, "protein": 0.8, "fat": 0.2, "sugar": 1.5, "sodium": 410},
-    "갓김치": {"category": "김치류", "unit": "접시", "cal": 18, "carbs": 3.2, "protein": 1.3, "fat": 0.3, "sugar": 1.2, "sodium": 460},
-    "백김치": {"category": "김치류", "unit": "접시", "cal": 10, "carbs": 1.8, "protein": 0.7, "fat": 0.1, "sugar": 0.8, "sodium": 310},
-    "부추김치": {"category": "김치류", "unit": "접시", "cal": 22, "carbs": 3.5, "protein": 1.2, "fat": 0.4, "sugar": 1.4, "sodium": 430},
-    "열무김치": {"category": "김치류", "unit": "접시", "cal": 12, "carbs": 2.0, "protein": 0.9, "fat": 0.2, "sugar": 0.8, "sodium": 380},
-    "오이소박이": {"category": "김치류", "unit": "접시", "cal": 20, "carbs": 3.5, "protein": 1.0, "fat": 0.2, "sugar": 1.8, "sodium": 390},
-    "총각김치": {"category": "김치류", "unit": "접시", "cal": 18, "carbs": 3.2, "protein": 1.2, "fat": 0.3, "sugar": 1.1, "sodium": 450},
-    "파김치": {"category": "김치류", "unit": "접시", "cal": 25, "carbs": 3.8, "protein": 1.4, "fat": 0.5, "sugar": 1.5, "sodium": 430},
-    "나박김치": {"category": "김치류", "unit": "대접", "cal": 14, "carbs": 2.8, "protein": 0.6, "fat": 0.1, "sugar": 1.7, "sodium": 460},
-    "가지볶음": {"category": "반찬류", "unit": "접시", "cal": 60, "carbs": 7.0, "protein": 1.5, "fat": 3.0, "sugar": 2.5, "sodium": 380},
-    "감자조림": {"category": "반찬류", "unit": "접시", "cal": 95, "carbs": 18.0, "protein": 2.0, "fat": 1.5, "sugar": 4.0, "sodium": 420},
-    "감자채볶음": {"category": "반찬류", "unit": "접시", "cal": 85, "carbs": 15.0, "protein": 1.8, "fat": 2.2, "sugar": 1.0, "sodium": 310},
-    "고사리나물": {"category": "나물류", "unit": "접시", "cal": 50, "carbs": 6.0, "protein": 2.5, "fat": 2.0, "sugar": 0.8, "sodium": 310},
-    "도라지무침": {"category": "나물류", "unit": "접시", "cal": 65, "carbs": 11.0, "protein": 1.5, "fat": 1.8, "sugar": 2.0, "sodium": 330},
-    "두부조림": {"category": "반찬류", "unit": "접시", "cal": 130, "carbs": 5.0, "protein": 12.0, "fat": 7.0, "sugar": 2.5, "sodium": 580},
-    "두부김치": {"category": "안주/반찬", "unit": "접시", "cal": 240, "carbs": 10.0, "protein": 18.0, "fat": 14.0, "sugar": 3.5, "sodium": 790},
-    "땅콩조림": {"category": "반찬류", "unit": "접시", "cal": 140, "carbs": 11.0, "protein": 6.0, "fat": 8.0, "sugar": 5.0, "sodium": 390},
-    "멸치볶음": {"category": "반찬류", "unit": "접시", "cal": 95, "carbs": 6.0, "protein": 8.0, "fat": 4.0, "sugar": 4.0, "sodium": 410},
-    "무생채": {"category": "나물류", "unit": "접시", "cal": 30, "carbs": 6.0, "protein": 0.8, "fat": 0.2, "sugar": 2.5, "sodium": 390},
-    "미역줄기볶음": {"category": "반찬류", "unit": "접시", "cal": 45, "carbs": 4.0, "protein": 1.8, "fat": 2.5, "sugar": 0.5, "sodium": 480},
-    "숙주나물": {"category": "나물류", "unit": "접시", "cal": 35, "carbs": 2.8, "protein": 3.0, "fat": 1.2, "sugar": 0.3, "sodium": 250},
-    "시금치나물": {"category": "나물류", "unit": "접시", "cal": 45, "carbs": 4.0, "protein": 3.2, "fat": 1.8, "sugar": 0.5, "sodium": 290},
-    "애호박볶음": {"category": "반찬류", "unit": "접시", "cal": 55, "carbs": 6.0, "protein": 1.8, "fat": 2.8, "sugar": 2.5, "sodium": 320},
-    "어묵볶음": {"category": "반찬류", "unit": "접시", "cal": 140, "carbs": 14.0, "protein": 8.0, "fat": 5.5, "sugar": 3.5, "sodium": 680},
-    "연근조림": {"category": "반찬류", "unit": "접시", "cal": 75, "carbs": 15.0, "protein": 1.8, "fat": 0.5, "sugar": 8.0, "sodium": 350},
-    "우엉조림": {"category": "반찬류", "unit": "접시", "cal": 80, "carbs": 16.0, "protein": 1.6, "fat": 1.0, "sugar": 7.0, "sodium": 390},
-    "장조림": {"category": "반찬류", "unit": "접시", "cal": 85, "carbs": 3.0, "protein": 13.0, "fat": 2.0, "sugar": 2.5, "sodium": 620},
-    "메추리알장조림": {"category": "반찬류", "unit": "접시", "cal": 95, "carbs": 4.0, "protein": 8.5, "fat": 5.0, "sugar": 3.0, "sodium": 590},
-    "콩나물무침": {"category": "나물류", "unit": "접시", "cal": 40, "carbs": 3.0, "protein": 3.5, "fat": 1.5, "sugar": 0.5, "sodium": 280},
-    "콩자반": {"category": "반찬류", "unit": "접시", "cal": 110, "carbs": 12.0, "protein": 8.5, "fat": 3.0, "sugar": 6.0, "sodium": 420},
-    "깻잎장아찌": {"category": "반찬류", "unit": "접시", "cal": 30, "carbs": 4.5, "protein": 1.8, "fat": 0.4, "sugar": 2.0, "sodium": 490},
-    "계란말이": {"category": "반찬류", "unit": "접시", "cal": 190, "carbs": 2.5, "protein": 14.0, "fat": 13.5, "sugar": 1.0, "sodium": 420},
-    "계란찜": {"category": "반찬류", "unit": "뚝배기", "cal": 140, "carbs": 3.0, "protein": 12.0, "fat": 8.5, "sugar": 1.2, "sodium": 550},
-    "계란후라이": {"category": "반찬류", "unit": "개", "cal": 90, "carbs": 0.5, "protein": 6.5, "fat": 7.0, "sugar": 0.2, "sodium": 110},
-    "소세지볶음": {"category": "반찬류", "unit": "접시", "cal": 210, "carbs": 12.0, "protein": 8.0, "fat": 14.0, "sugar": 5.0, "sodium": 650},
-
-    # 면/만두류
-    "라면": {"category": "면류", "unit": "그릇", "cal": 520, "carbs": 82.0, "protein": 12.0, "fat": 16.0, "sugar": 4.0, "sodium": 1780},
-    "막국수": {"category": "면류", "unit": "그릇", "cal": 480, "carbs": 90.0, "protein": 13.0, "fat": 6.0, "sugar": 11.0, "sodium": 1350},
-    "물냉면": {"category": "면류", "unit": "그릇", "cal": 460, "carbs": 94.0, "protein": 14.0, "fat": 2.0, "sugar": 11.0, "sodium": 1550},
-    "비빔냉면": {"category": "면류", "unit": "그릇", "cal": 510, "carbs": 98.0, "protein": 15.0, "fat": 5.0, "sugar": 18.0, "sodium": 1420},
-    "수제비": {"category": "면류", "unit": "그릇", "cal": 420, "carbs": 84.0, "protein": 12.0, "fat": 3.5, "sugar": 2.0, "sodium": 1380},
-    "잔치국수": {"category": "면류", "unit": "그릇", "cal": 380, "carbs": 72.0, "protein": 12.0, "fat": 4.0, "sugar": 3.0, "sodium": 1450},
-    "잡채": {"category": "면류", "unit": "접시", "cal": 210, "carbs": 32.0, "protein": 5.0, "fat": 7.0, "sugar": 5.0, "sodium": 520},
-    "짜장면": {"category": "면류", "unit": "그릇", "cal": 680, "carbs": 110.0, "protein": 18.0, "fat": 18.0, "sugar": 9.0, "sodium": 1650},
-    "짬뽕": {"category": "면류", "unit": "그릇", "cal": 590, "carbs": 92.0, "protein": 24.0, "fat": 14.0, "sugar": 6.0, "sodium": 1950},
-    "쫄면": {"category": "면류", "unit": "그릇", "cal": 490, "carbs": 96.0, "protein": 12.0, "fat": 6.0, "sugar": 15.0, "sodium": 1480},
-    "칼국수": {"category": "면류", "unit": "그릇", "cal": 460, "carbs": 86.0, "protein": 14.0, "fat": 5.0, "sugar": 2.5, "sodium": 1520},
-    "콩국수": {"category": "면류", "unit": "그릇", "cal": 510, "carbs": 74.0, "protein": 24.0, "fat": 13.0, "sugar": 3.0, "sodium": 820},
-    "열무국수": {"category": "면류", "unit": "그릇", "cal": 390, "carbs": 76.0, "protein": 11.0, "fat": 3.5, "sugar": 8.0, "sodium": 1450},
-    "만두": {"category": "만두류", "unit": "접시(5개)", "cal": 320, "carbs": 36.0, "protein": 14.0, "fat": 13.0, "sugar": 2.0, "sodium": 650},
-
-    # 분식/전/기타
-    "떡볶이": {"category": "분식", "unit": "인분", "cal": 380, "carbs": 76.0, "protein": 7.0, "fat": 4.5, "sugar": 14.0, "sodium": 1150},
-    "라볶이": {"category": "분식", "unit": "인분", "cal": 520, "carbs": 92.0, "protein": 11.0, "fat": 11.0, "sugar": 16.0, "sodium": 1480},
-    "순대": {"category": "분식", "unit": "인분", "cal": 360, "carbs": 48.0, "protein": 12.0, "fat": 13.0, "sugar": 1.0, "sodium": 750},
-    "떡꼬치": {"category": "분식", "unit": "개", "cal": 220, "carbs": 44.0, "protein": 3.5, "fat": 3.0, "sugar": 11.0, "sodium": 420},
-    "피자": {"category": "양식", "unit": "조각", "cal": 320, "carbs": 35.0, "protein": 13.0, "fat": 14.0, "sugar": 4.0, "sodium": 620},
-    "감자전": {"category": "전류", "unit": "장", "cal": 240, "carbs": 38.0, "protein": 4.0, "fat": 8.0, "sugar": 1.0, "sodium": 350},
-    "김치전": {"category": "전류", "unit": "장", "cal": 280, "carbs": 34.0, "protein": 7.0, "fat": 13.0, "sugar": 2.5, "sodium": 780},
-    "동그랑땡": {"category": "전류", "unit": "접시(5개)", "cal": 220, "carbs": 12.0, "protein": 14.0, "fat": 13.0, "sugar": 1.5, "sodium": 450},
-    "생선전": {"category": "전류", "unit": "접시", "cal": 190, "carbs": 8.0, "protein": 18.0, "fat": 9.5, "sugar": 0.5, "sodium": 410},
-    "파전": {"category": "전류", "unit": "장", "cal": 340, "carbs": 42.0, "protein": 12.0, "fat": 14.0, "sugar": 3.0, "sodium": 690},
-    "호박전": {"category": "전류", "unit": "접시", "cal": 150, "carbs": 16.0, "protein": 4.0, "fat": 7.5, "sugar": 2.5, "sodium": 320},
-    "새우튀김": {"category": "튀김류", "unit": "개(3개)", "cal": 240, "carbs": 18.0, "protein": 12.0, "fat": 13.5, "sugar": 1.0, "sodium": 420},
-    "오징어튀김": {"category": "튀김류", "unit": "개(3개)", "cal": 260, "carbs": 22.0, "protein": 14.0, "fat": 12.5, "sugar": 1.0, "sodium": 450},
-    "고추튀김": {"category": "튀김류", "unit": "개(2개)", "cal": 190, "carbs": 16.0, "protein": 8.0, "fat": 10.0, "sugar": 1.5, "sodium": 380},
-    "도토리묵": {"category": "무침류", "unit": "접시", "cal": 90, "carbs": 18.0, "protein": 1.5, "fat": 1.0, "sugar": 2.0, "sodium": 490},
-    "경단": {"category": "떡/한과", "unit": "알(5개)", "cal": 180, "carbs": 38.0, "protein": 3.5, "fat": 1.0, "sugar": 12.0, "sodium": 120},
-    "꿀떡": {"category": "떡/한과", "unit": "알(5개)", "cal": 195, "carbs": 44.0, "protein": 2.5, "fat": 0.5, "sugar": 16.0, "sodium": 110},
-    "송편": {"category": "떡/한과", "unit": "알(5개)", "cal": 220, "carbs": 48.0, "protein": 3.5, "fat": 1.2, "sugar": 14.0, "sodium": 130},
-    "약과": {"category": "떡/한과", "unit": "개", "cal": 140, "carbs": 21.0, "protein": 1.2, "fat": 5.5, "sugar": 9.0, "sodium": 40},
-    "식혜": {"category": "음료", "unit": "캔/잔", "cal": 120, "carbs": 29.0, "protein": 0.5, "fat": 0.1, "sugar": 24.0, "sodium": 15}
-}
-
-# ===============================================================================
-# [3] 5차 단일 모델 로드 및 추론
-# ===============================================================================
 @st.cache_resource
 def load_5th_model():
     model_path = "best.pt"
@@ -241,7 +125,7 @@ def run_5th_model(image, conf_val=0.08, iou_val=0.45, imgsz_val=960):
     return detected_items, annotated_img
 
 # ==============================================================================
-# [4] 가상 데이터 생성 및 세션 초기화
+# [5] 가상 데이터 생성 및 세션 초기화
 # ==============================================================================
 def generate_mock_meals(count=20):
     sample_keys = list(NUTRITION_DB.keys())
@@ -286,7 +170,7 @@ if "last_added_message" not in st.session_state:
     st.session_state.last_added_message = None
 
 # ==============================================================================
-# [5] 사이드바 네비게이션 & 실시간 AI 파라미터 조절
+# [6] 사이드바 네비게이션 & 실시간 AI 파라미터 조절
 # ==============================================================================
 st.sidebar.title("📌 네비게이션")
 view_mode = st.sidebar.radio("화면 모드", ["📷 음식 사진 분석 및 추가", "📊 종합 통계 대시보드"])
@@ -316,11 +200,11 @@ if st.sidebar.button("🗑️ 전체 데이터 비우기"):
 daily_goal = st.sidebar.number_input("🎯 1일 목표 칼로리 (kcal)", 1200, 3500, 2000, 100)
 
 # ==============================================================================
-# [6] 화면 1: 다중 사진 분석 및 5차 모델 음식 감지
+# [7] 화면 1: 다중 사진 분석 및 5차 모델 음식 감지
 # ==============================================================================
 if view_mode == "📷 음식 사진 분석 및 추가":
     st.title("📷 AI 5차 모델 다중 음식 감지 & 식단 등록")
-    st.caption("🟢 초록색: 5차 59종 한식 / 🔵 파란색: 일반 과일·양식 모델")
+    st.caption("🟢 초록색: 5차 59종 한식")
 
     if st.session_state.last_added_message:
         st.success(st.session_state.last_added_message)
@@ -470,7 +354,7 @@ if view_mode == "📷 음식 사진 분석 및 추가":
                 st.rerun()
 
 # ==============================================================================
-# [7] 화면 2: 대시보드
+# [8] 화면 2: 대시보드
 # ==============================================================================
 elif view_mode == "📊 종합 통계 대시보드":
     st.title("📊 다이어트 영양 통계 대시보드")
