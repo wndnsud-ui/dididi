@@ -314,6 +314,7 @@ def load_ensemble_models():
     model_configs = [
         {"path": "best.pt", "label": "YOLOv8-s", "weight": 1.0},
         {"path": "best (2).pt", "label": "YOLOv8-m", "weight": 1.1},
+        {"path": "7차best.pt", "label": "YOLOv7차", "weight": 1.2},  # 👈 7차 모델 추가 (가중치는 성능에 따라 조절 가능)
     ]
     data_path = "5차data.yaml"
 
