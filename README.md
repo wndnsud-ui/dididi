@@ -69,6 +69,16 @@ streamlit run app.py
 - `CaloDetect_nutrition_all_matched.csv`의 음식명과 영양 수치가 대시보드 계산에 사용됩니다.
 - `requirements.txt`에 필요한 패키지가 추가되면 바로 설치됩니다.
 
+## 앙상블 적용 기록
+
+`app.py`에 YOLOv8-s와 YOLOv8-m 모델의 예측 결과를 결합하는 WBF(Weighted Box Fusion) 앙상블을 적용했습니다.
+
+1. 134행: `load_ensemble_models()`에서 두 모델을 함께 로드하고 캐싱
+2. 137행: YOLOv8-m 모델 가중치인 `best (2).pt` 로드
+3. 211행: `weighted_box_fusion()`에서 동일 클래스의 중첩 박스를 결합
+4. 307행: 탐지 결과의 `source` 필드에 앙상블 참여 모델 표시
+5. 376행: 분석 해상도(`imgsz`) 선택 범위의 최저값을 512까지 낮춤
+
 ## 참고사항
 
 - 모델 파일이 해당 폴더에 있어야 정상 실행됩니다.

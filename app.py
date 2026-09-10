@@ -130,65 +130,189 @@ NUTRITION_DB = load_nutrition_db(
 
 
 # [4] 5차 비전 AI 모델 로드 및 추론 함수
-@st.cache_resource  # 모델은 메모리에 한 번만 로드하고 재사용하도록 캐싱 처리
-def load_5th_model():
-    model_path = "best.pt"  # YOLO 학습 가중치 파일 경로
-    data_path = "5차data.yaml"  # 클래스 정보가 담긴 설정 파일 경로
+@st.cache_resource  # 두 모델은 메모리에 한 번만 로드하고 재사용하도록 캐싱 처리
+def load_ensemble_models():
+    model_configs = [
+        {"path": "best.pt", "label": "YOLOv8-s", "weight": 1.0},
+        {"path": "best (2).pt", "label": "YOLOv8-m", "weight": 1.1},
+    ]
+    data_path = "5차data.yaml"
 
-    if not os.path.exists(model_path):
-        raise FileNotFoundError(f"필수 모델 파일이 없습니다: {model_path}")
     if not os.path.exists(data_path):
         raise FileNotFoundError(f"필수 데이터 설정 파일이 없습니다: {data_path}")
 
-    # YAML 설정 파일 열기
     with open(data_path, "r", encoding="utf-8") as yaml_file:
         data_config = yaml.safe_load(yaml_file)
 
-    yaml_names = data_config["names"]
-    if isinstance(yaml_names, dict):
-        yaml_names = [yaml_names[index] for index in range(data_config["nc"])]
+    class_names = data_config["names"]
+    if isinstance(class_names, dict):
+        class_names = [class_names[index] for index in range(data_config["nc"])]
 
-    if len(yaml_names) != data_config["nc"]:
+    if len(class_names) != data_config["nc"]:
         raise ValueError("5차data.yaml의 nc와 names 개수가 다릅니다.")
 
-    # YOLO 모델 초기화 및 클래스 이름 일치 여부 검증
-    model = YOLO(model_path)
-    model_names = [model.names[index] for index in range(len(model.names))]
-    if model_names != yaml_names:
-        raise ValueError("5차best.pt의 클래스 순서 또는 이름이 5차data.yaml과 다릅니다.")
+    loaded_models = []
+    for config in model_configs:
+        if not os.path.exists(config["path"]):
+            raise FileNotFoundError(f"필수 모델 파일이 없습니다: {config['path']}")
 
-    return model, yaml_names
+        model = YOLO(config["path"])
+        model_names = [model.names[index] for index in range(len(model.names))]
+        if model_names != class_names:
+            raise ValueError(
+                f"{config['path']}의 클래스 순서 또는 이름이 5차data.yaml과 다릅니다."
+            )
+
+        loaded_models.append({
+            "model": model,
+            "label": config["label"],
+            "weight": config["weight"],
+        })
+
+    return loaded_models, class_names
+
+
+def calculate_iou(box1, box2):
+    intersection_x1 = max(box1[0], box2[0])
+    intersection_y1 = max(box1[1], box2[1])
+    intersection_x2 = min(box1[2], box2[2])
+    intersection_y2 = min(box1[3], box2[3])
+
+    intersection = (
+        max(0.0, intersection_x2 - intersection_x1)
+        * max(0.0, intersection_y2 - intersection_y1)
+    )
+    area1 = max(0.0, box1[2] - box1[0]) * max(0.0, box1[3] - box1[1])
+    area2 = max(0.0, box2[2] - box2[0]) * max(0.0, box2[3] - box2[1])
+    union = area1 + area2 - intersection
+
+    return intersection / union if union > 0 else 0.0
+
+
+def fuse_cluster(cluster):
+    weighted_scores = [
+        detection["conf"] * detection["model_weight"]
+        for detection in cluster
+    ]
+    total_score = sum(weighted_scores)
+    fused_box = [
+        sum(
+            detection["box"][coordinate] * score
+            for detection, score in zip(cluster, weighted_scores)
+        ) / total_score
+        for coordinate in range(4)
+    ]
+    total_model_weight = sum(detection["model_weight"] for detection in cluster)
+    fused_confidence = total_score / total_model_weight
+
+    return fused_box, fused_confidence
+
+
+def weighted_box_fusion(detections, iou_threshold=0.55):
+    sorted_detections = sorted(
+        detections,
+        key=lambda detection: detection["conf"] * detection["model_weight"],
+        reverse=True,
+    )
+    clusters = []
+
+    for detection in sorted_detections:
+        best_cluster = None
+        best_iou = 0.0
+
+        for cluster in clusters:
+            if cluster[0]["cls_id"] != detection["cls_id"]:
+                continue
+
+            fused_box, _ = fuse_cluster(cluster)
+            current_iou = calculate_iou(detection["box"], fused_box)
+            if current_iou >= iou_threshold and current_iou > best_iou:
+                best_cluster = cluster
+                best_iou = current_iou
+
+        if best_cluster is None:
+            clusters.append([detection])
+        else:
+            best_cluster.append(detection)
+
+    fused_detections = []
+    for cluster in clusters:
+        fused_box, fused_confidence = fuse_cluster(cluster)
+        fused_detections.append({
+            "cls_id": cluster[0]["cls_id"],
+            "box": fused_box,
+            "conf": fused_confidence,
+            "models": sorted({detection["model_label"] for detection in cluster}),
+        })
+
+    return sorted(
+        fused_detections,
+        key=lambda detection: detection["conf"],
+        reverse=True,
+    )
+
 
 def run_5th_model(image, conf_val=0.08, iou_val=0.45, imgsz_val=960):
-    model, class_names = load_5th_model()
-    
-    # YOLO 추론 수행 (신뢰도 Conf, 중복 제거 IoU, 분석 해상도 반영)
-    result = model(image, conf=conf_val, iou=iou_val, imgsz=imgsz_val, verbose=False)[0]
+    models, class_names = load_ensemble_models()
+    raw_detections = []
+
+    # 두 모델을 동일한 조건으로 추론한 뒤 WBF 입력 형식으로 모은다.
+    for model_info in models:
+        result = model_info["model"](
+            image,
+            conf=conf_val,
+            iou=iou_val,
+            imgsz=imgsz_val,
+            verbose=False,
+        )[0]
+
+        for box in result.boxes:
+            raw_detections.append({
+                "cls_id": int(box.cls[0]),
+                "conf": float(box.conf[0]),
+                "box": box.xyxy[0].tolist(),
+                "model_label": model_info["label"],
+                "model_weight": model_info["weight"],
+            })
+
+    fused_results = weighted_box_fusion(raw_detections, iou_threshold=0.55)
     detected_items = []
     annotated_img = image.copy()
     draw = ImageDraw.Draw(annotated_img)
+    image_width, image_height = image.size
 
-    # 탐지된 각 바운딩 박스 순회
-    for box in result.boxes:
-        cls_id = int(box.cls[0])
+    for detection in fused_results:
+        cls_id = detection["cls_id"]
         name = class_names[cls_id]
-        conf = float(box.conf[0])
-        xyxy = box.xyxy[0].tolist()
+        confidence = detection["conf"]
+        xyxy = detection["box"]
         x1, y1, x2, y2 = map(int, xyxy)
-        w, h = image.size
-        crop_box = (max(0, x1), max(0, y1), min(w, x2), min(h, y2))
-        crop_img = image.crop(crop_box) if crop_box[2] > crop_box[0] and crop_box[3] > crop_box[1] else None
-        
+        crop_box = (
+            max(0, x1),
+            max(0, y1),
+            min(image_width, x2),
+            min(image_height, y2),
+        )
+        crop_img = (
+            image.crop(crop_box)
+            if crop_box[2] > crop_box[0] and crop_box[3] > crop_box[1]
+            else None
+        )
+        model_source = " + ".join(detection["models"])
+
         detected_items.append({
             "name": name,
-            "conf": conf * 100,
+            "conf": confidence * 100,
             "box": xyxy,
-            "source": "한식59(5차best)",
-            "crop": crop_img
+            "source": f"앙상블({model_source})",
+            "crop": crop_img,
         })
-        # 이미지 위에 탐지 객체 경계 상자 및 라벨 텍스트 드로잉
         draw.rectangle([x1, y1, x2, y2], outline="#28a745", width=3)
-        draw.text((x1 + 4, max(0, y1 - 16)), f"{name} ({conf * 100:.0f}%)", fill="#28a745")
+        draw.text(
+            (x1 + 4, max(0, y1 - 16)),
+            f"{name} ({confidence * 100:.0f}%)",
+            fill="#28a745",
+        )
 
     return detected_items, annotated_img
 
@@ -249,7 +373,7 @@ st.sidebar.write("---")
 st.sidebar.subheader("⚙️ AI 5차 모델 탐지 설정")
 conf_threshold = st.sidebar.slider("AI 감지 신뢰도(Conf) 기준", 0.01, 0.40, 0.08, 0.01, help="낮출수록 더 많은 음식을 민감하게 찾아냅니다.")
 iou_threshold = st.sidebar.slider("중복 제거(IoU) 기준", 0.20, 0.70, 0.45, 0.05, help="인접한 반찬이 지워지지 않도록 조정합니다.")
-imgsz_choice = st.sidebar.select_slider("분석 해상도(imgsz)", options=[640, 800, 960, 1024, 1280], value=960, help="해상도가 클수록 작은 반찬을 선명하게 감지합니다.")
+imgsz_choice = st.sidebar.select_slider("분석 해상도(imgsz)", options=[512,640, 800, 960, 1024, 1280], value=960, help="해상도가 클수록 작은 반찬을 선명하게 감지합니다.")
 
 st.sidebar.write("---")
 st.sidebar.subheader("🎲 가상 데이터 관리")
