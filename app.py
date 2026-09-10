@@ -16,94 +16,268 @@ st.set_page_config(
 )
 
 
-# [2] 고급 건강검진 / 영양분석 서비스 스타일 (CSS 디자인 시스템 정의)
+# [2] 고급 건강검진 / 영양분석 서비스 스타일 (불필요한 접두사 제거 및 가독성 개선)
 st.markdown(
     """
     <style>
-/* 헬스케어 엔터프라이즈 테마 전용 CSS 변수 선언 (네이비, 블루, 틸 그린 색상 조합) */
-:root {
-  --nv-navy:#16324F; --nv-blue:#2F5B7C; --nv-teal:#238A8D;
-  --nv-bg:#F6F8FA; --nv-surface:#FFFFFF; --nv-border:#E2E8ED;
-  --nv-text:#243746; --nv-muted:#71808C; --nv-soft:#EEF6F6;
-}
-/* 전역 폰트 및 애플리케이션 배경 색상 설정 */
-html, body, [class*="css"] { font-family:'Noto Sans KR',sans-serif; }
-.stApp { background:var(--nv-bg); color:var(--nv-text); }
-[data-testid="stHeader"] { background:rgba(246,248,250,.96); }
-[data-testid="stSidebar"] { background:#fff; border-right:1px solid var(--nv-border); }
-[data-testid="stSidebar"] > div:first-child { padding-top:1.25rem; }
-.block-container { max-width:1480px; padding:1.7rem 2.2rem 3rem; }
+        /* 헬스케어 엔터프라이즈 테마 전용 CSS 변수 선언 (직관적인 이름 사용) */
+        :root {
+            --navy: #16324F;       /* 앱 전체의 핵심 브랜드 컬러인 딥 네이비 색상 */
+            --blue: #2F5B7C;       /* 보조 포인트 컬러로 사용되는 블루 색상 */
+            --teal: #238A8D;       /* 헬스케어 감성을 주는 틸(청록) 포인트 색상 */
+            --bg: #F6F8FA;         /* 애플리케이션 전체 배경의 부드러운 연회색 */
+            --surface: #FFFFFF;    /* 카드 및 컨테이너 박스의 배경이 되는 순백색 */
+            --border: #E2E8ED;     /* 컴포넌트 테두리 경계선의 은은한 회색 */
+            --text: #243746;       /* 화면에 표시되는 기본 본문 텍스트 색상 */
+            --muted: #71808C;      /* 강조도가 낮은 보조 텍스트 및 레이블의 색상 */
+            --soft: #EEF6F6;       /* 태그나 소프트 배경에 쓰이는 연한 틸 계열 색상 */
+        }
 
-/* 타이틀 및 섹션 헤더 타이포그래피 스타일링 */
-h1,h2,h3 { color:var(--nv-navy)!important; font-weight:800!important; letter-spacing:-.035em; }
-h1 { font-size:2rem!important; margin-bottom:.25rem!important; }
-h2 { font-size:1.35rem!important; }
-h3 { font-size:1.05rem!important; }
-.page-kicker { color:var(--nv-teal); font-size:.72rem; font-weight:800; letter-spacing:.14em; margin-bottom:.45rem; }
-.page-description { color:var(--nv-muted); font-size:.9rem; line-height:1.6; margin-bottom:1.25rem; }
-.section-title { color:var(--nv-navy); font-size:.9rem; font-weight:800; letter-spacing:.05em; margin:1.35rem 0 .7rem; text-transform:uppercase; }
+        /* 전역 레이아웃 및 기본 폰트 설정 */
+        html, body, [class*="css"] {
+            font-family: 'Noto Sans KR', sans-serif;  /* 앱 전체 기본 폰트 지정 */
+        }
 
-/* 사이드바 브랜드 로고 및 서브타이틀 디자인 */
-.sidebar-brand { color:var(--nv-navy); font-size:1.2rem; font-weight:800; letter-spacing:-.03em; }
-.sidebar-sub { color:#84919A; font-size:.72rem; margin:2px 0 18px; }
+        .stApp {
+            background: var(--bg);     /* 앱 전역 배경색 적용 */
+            color: var(--text);        /* 앱 전역 기본 텍스트 색상 적용 */
+        }
 
-/* 카드 형태 컴포넌트 디자인 (박스 그림자 및 곡선 테두리) */
-.health-card,.enterprise-card,.report-box { background:var(--nv-surface); border:1px solid var(--nv-border); border-radius:12px; box-shadow:0 2px 10px rgba(22,50,79,.035); }
-.health-card { padding:18px 20px; }
-.report-box { padding:18px 20px; margin:.5rem 0 1rem; }
-.report-title { color:var(--nv-navy); font-size:.92rem; font-weight:800; margin-bottom:7px; }
-.report-text { color:#647480; font-size:.83rem; line-height:1.7; }
+        [data-testid="stHeader"] {
+            background: rgba(246, 248, 250, 0.96);  /* 상단 헤더 배경색 */
+        }
 
-/* KPI 메트릭 카드 라벨 및 수치 디자인 */
-.metric-label { color:var(--nv-muted); font-size:.72rem; font-weight:700; letter-spacing:.07em; text-transform:uppercase; }
-.metric-value { color:var(--nv-navy); font-size:1.75rem; font-weight:800; line-height:1.1; margin-top:7px; }
-.metric-unit { color:#6D7C87; font-size:.8rem; font-weight:500; margin-left:3px; }
-.metric-note,.small-muted { color:#87949E; font-size:.7rem; margin-top:7px; }
+        [data-testid="stSidebar"] {
+            background: #FFFFFF;                     /* 사이드바 배경을 흰색으로 고정 */
+            border-right: 1px solid var(--border);   /* 사이드바 우측 경계선 */
+        }
 
-/* 영양 상태 평가 상태별 텍스트 색상 클래스 */
-.status-good { color:var(--nv-teal); font-weight:700; }
-.status-warning { color:#A46A00; font-weight:700; }
-.tag { display:inline-block; background:var(--nv-soft); color:#237779; border:1px solid #D5EAEA; padding:4px 8px; border-radius:999px; font-size:.72rem; font-weight:700; margin:2px 3px 2px 0; }
+        [data-testid="stSidebar"] > div:first-child {
+            padding-top: 1.25rem;                    /* 사이드바 상단 여백 조절 */
+        }
 
-/* 버튼 및 입력 폼 UI 컴포넌트 디자인 설정 */
-.stButton > button,.stDownloadButton > button { border-radius:8px; font-weight:700; border:1px solid var(--nv-border); }
-[data-testid="stFileUploader"] { background:#fff; border:1px dashed #C8D4DC; border-radius:10px; }
-[data-testid="stMetric"] { background:#fff; border:1px solid var(--nv-border); border-radius:10px; padding:12px 14px; }
-[data-testid="stDataFrame"] { border:1px solid var(--nv-border); border-radius:10px; overflow:hidden; }
-div[data-baseweb="select"] > div, div[data-baseweb="input"] > div { border-radius:8px; }
-hr { border:0; border-top:1px solid var(--nv-border); margin:1.2rem 0; }
-</style>
+        .block-container {
+            max-width: 1480px;                       /* 메인 대시보드 최대 가로 폭 제한 */
+            padding: 1.7rem 2.2rem 3rem;             /* 컨테이너 내부 패딩 설정 */
+        }
+
+        /* 타이틀 및 섹션 헤더 타이포그래피 스타일링 */
+        h1, h2, h3 {
+            color: var(--navy) !important;           /* 주요 제목 색상을 네이비로 강제 고정 */
+            font-weight: 800 !important;             /* 제목 폰트 두께를 매우 두껍게 설정 */
+            letter-spacing: -0.035em;                /* 자간을 좁혀 모던한 느낌 연출 */
+        }
+
+        h1 {
+            font-size: 2rem !important;              /* 최상단 메인 타이틀 크기 */
+            margin-bottom: 0.25rem !important;       /* 하단 여백 축소 */
+        }
+
+        h2 {
+            font-size: 1.35rem !important;           /* 중간 타이틀 크기 */
+        }
+
+        h3 {
+            font-size: 1.05rem !important;           /* 소제목 크기 */
+        }
+
+        .page-kicker {
+            color: var(--teal);                      /* 상단 소형 레이블 컬러 */
+            font-size: 0.72rem;                      /* 폰트 크기 작게 설정 */
+            font-weight: 800;                        /* 폰트 두께 강조 */
+            letter-spacing: 0.14em;                  /* 자간을 넓혀 세련된 감성 부여 */
+            margin-bottom: 0.45rem;                  /* 하단 여백 설정 */
+        }
+
+        .page-description {
+            color: var(--muted);                     /* 설명 문구 보조 색상 */
+            font-size: 0.9rem;                       /* 폰트 크기 설정 */
+            line-height: 1.6;                        /* 줄 간격 확보 */
+            margin-bottom: 1.25rem;                  /* 하단 여백 설정 */
+        }
+
+        .section-title {
+            color: var(--navy);                      /* 섹션 타이틀 네이비 색상 */
+            font-size: 0.9rem;                       /* 폰트 크기 */
+            font-weight: 800;                        /* 폰트 두께 */
+            letter-spacing: 0.05em;                  /* 자간 설정 */
+            margin: 1.35rem 0 0.7rem;                /* 상하 마진 설정 */
+            text-transform: uppercase;               /* 알파벳 대문자 변환 */
+        }
+
+        /* 사이드바 브랜드 로고 및 서브타이틀 디자인 */
+        .sidebar-brand {
+            color: var(--navy);                      /* 브랜드 네이비 색상 */
+            font-size: 1.2rem;                       /* 로고 글자 크기 */
+            font-weight: 800;                        /* 굵게 설정 */
+            letter-spacing: -0.03em;                 /* 자간 좁힘 */
+        }
+
+        .sidebar-sub {
+            color: #84919A;                          /* 서브 타이틀 연한 회색 */
+            font-size: 0.72rem;                      /* 작은 글자 크기 */
+            margin: 2px 0 18px;                      /* 상하 마진 */
+        }
+
+        /* 카드 형태 컴포넌트 디자인 (박스 그림자 및 곡선 테두리) */
+        .health-card, .enterprise-card, .report-box {
+            background: var(--surface);              /* 카드 배경 순백색 */
+            border: 1px solid var(--border);         /* 테두리선 회색 */
+            border-radius: 12px;                     /* 모서리 둥글게 처리 */
+            box-shadow: 0 2px 10px rgba(22, 50, 79, 0.035); /* 은은한 입체 그림자 */
+        }
+
+        .health-card {
+            padding: 18px 20px;                      /* 헬스케어 카드 내부 패딩 */
+        }
+
+        .report-box {
+            padding: 18px 20px;                      /* 리포트 박스 내부 패딩 */
+            margin: 0.5rem 0 1rem;                   /* 상하 마진 설정 */
+        }
+
+        .report-title {
+            color: var(--navy);                      /* 리포트 제목 네이비 색상 */
+            font-size: 0.92rem;                      /* 폰트 크기 */
+            font-weight: 800;                        /* 폰트 두께 */
+            margin-bottom: 7px;                      /* 하단 여백 */
+        }
+
+        .report-text {
+            color: #647480;                          /* 리포트 본문 회색조 컬러 */
+            font-size: 0.83rem;                      /* 폰트 크기 */
+            line-height: 1.7;                        /* 줄 간격 설정 */
+        }
+
+        /* KPI 메트릭 카드 라벨 및 수치 디자인 */
+        .metric-label {
+            color: var(--muted);                     /* 지표 레이블 보조 회색 */
+            font-size: 0.72rem;                      /* 폰트 크기 작게 */
+            font-weight: 700;                        /* 폰트 두께 */
+            letter-spacing: 0.07em;                  /* 자간 넓힘 */
+            text-transform: uppercase;               /* 대문자 변환 */
+        }
+
+        .metric-value {
+            color: var(--navy);                      /* 핵심 숫자 네이비 컬러 */
+            font-size: 1.75rem;                      /* 큼직한 폰트 크기 */
+            font-weight: 800;                        /* 매우 두껍게 */
+            line-height: 1.1;                        /* 줄 높이 타이트하게 */
+            margin-top: 7px;                         /* 상단 마진 */
+        }
+
+        .metric-unit {
+            color: #6D7C87;                          /* 단위(kcal, g) 중간 채도 회색 */
+            font-size: 0.8rem;                       /* 단위 폰트 크기 */
+            font-weight: 500;                        /* 적당한 두께 */
+            margin-left: 3px;                        /* 숫자와 단위 간격 */
+        }
+
+        .metric-note, .small-muted {
+            color: #87949E;                          /* 보조 설명 연한 회색 */
+            font-size: 0.7rem;                       /* 아주 작은 폰트 크기 */
+            margin-top: 7px;                         /* 상단 마진 */
+        }
+
+        /* 영양 상태 평가 상태별 텍스트 색상 클래스 */
+        .status-good {
+            color: var(--teal);                      /* 양호 상태 틸 그린 컬러 */
+            font-weight: 700;                        /* 굵게 */
+        }
+
+        .status-warning {
+            color: #A46A00;                          /* 주의 상태 오렌지빛 브라운 */
+            font-weight: 700;                        /* 굵게 */
+        }
+
+        .tag {
+            display: inline-block;                   /* 인라인 블록 배치 */
+            background: var(--soft);                 /* 연한 소프트 배경 */
+            color: #237779;                          /* 진한 청록색 글자 */
+            border: 1px solid #D5EAEA;               /* 연한 테두리선 */
+            padding: 4px 8px;                        /* 내부 패딩 */
+            border-radius: 999px;                    /* 완전한 알약 형태 */
+            font-size: 0.72rem;                      /* 폰트 크기 */
+            font-weight: 700;                        /* 굵게 */
+            margin: 2px 3px 2px 0;                   /* 주변 마진 */
+        }
+
+        /* 버튼 및 입력 폼 UI 컴포넌트 디자인 설정 */
+        .stButton > button, .stDownloadButton > button {
+            border-radius: 8px;                      /* 버튼 모서리 둥글게 */
+            font-weight: 700;                        /* 버튼 글자 굵게 */
+            border: 1px solid var(--border);         /* 버튼 테두리선 지정 */
+        }
+
+        [data-testid="stFileUploader"] {
+            background: #FFFFFF;                     /* 업로더 박스 배경 흰색 */
+            border: 1px dashed #C8D4DC;              /* 세련된 점선 테두리 */
+            border-radius: 10px;                     /* 모서리 둥글게 */
+        }
+
+        [data-testid="stMetric"] {
+            background: #FFFFFF;                     /* 메트릭 박스 배경 흰색 */
+            border: 1px solid var(--border);         /* 테두리선 지정 */
+            border-radius: 10px;                     /* 모서리 둥글게 */
+            padding: 12px 14px;                      /* 내부 패딩 */
+        }
+
+        [data-testid="stDataFrame"] {
+            border: 1px solid var(--border);         /* 데이터프레임 테두리 */
+            border-radius: 10px;                     /* 모서리 둥글게 */
+            overflow: hidden;                        /* 테두리 밖 내용 숨김 */
+        }
+
+        div[data-baseweb="select"] > div, 
+        div[data-baseweb="input"] > div {
+            border-radius: 8px;                      /* 입력창 모서리 둥글게 */
+        }
+
+        hr {
+            border: 0;                               /* 기본 구분선 스타일 초기화 */
+            border-top: 1px solid var(--border);     /* 상단 커스텀 테두리선 지정 */
+            margin: 1.2rem 0;                        /* 상하 마진 설정 */
+        }
+    </style>
     """,
     unsafe_allow_html=True
 )
 
 
 # [3] CSV 영양 데이터 로드 및 정제 함수
-@st.cache_data  # 동일한 파일 경로 및 수정 시각일 경우 데이터를 캐싱하여 로딩 속도 최적화
+@st.cache_data  # 동일한 파일 경로와 수정 시각일 경우 결과를 캐싱하여 로딩 속도 최적화
 def load_nutrition_db(csv_path, csv_modified_time):
+    
     # CSV 파일에 반드시 존재해야 하는 필수 컬럼 집합 정의
     required_columns = {"food_name", "category", "unit", "cal", "carbs", "protein", "fat", "sugar", "sodium"}
 
-    # 지정된 경로에 CSV 파일이 존재하는지 확인
+    # 지정된 경로에 영양 데이터 CSV 파일이 실제 존재하는지 확인
     if not os.path.exists(csv_path):
         raise FileNotFoundError(f"영양 데이터 CSV 파일이 없습니다: {csv_path}")
 
-    # pandas를 이용해 UTF-8-sig 인코딩으로 CSV 파일 읽기
+    # pandas를 이용하여 한글 깨짐 방지 인코딩(utf-8-sig)으로 CSV 파일 로드
     nutrition_df = pd.read_csv(csv_path, encoding="utf-8-sig")
+    
+    # 정의된 필수 컬럼 중 CSV 파일에 누락된 컬럼이 있는지 확인
     missing_columns = required_columns - set(nutrition_df.columns)
     if missing_columns:
         raise ValueError(f"영양 데이터 CSV에 필요한 컬럼이 없습니다: {sorted(missing_columns)}")
 
+    # 데이터프레임 복사본 생성 및 음식명 전처리 (문자열 변환 후 앞뒤 공백 제거)
     nutrition_df = nutrition_df.copy()
-    nutrition_df["food_name"] = nutrition_df["food_name"].astype(str).str.strip()  # 음식명 공백 제거
-    nutrition_df = nutrition_df[nutrition_df["food_name"] != ""]                 # 빈 이름 행 제거
+    nutrition_df["food_name"] = nutrition_df["food_name"].astype(str).str.strip()
+    
+    # 음식명이 빈칸("")이거나 유효하지 않은 행은 데이터프레임에서 제거
+    nutrition_df = nutrition_df[nutrition_df["food_name"] != ""]
 
-    # 영양소 수치 데이터 컬럼들을 숫자로 변환하고 결측치는 0.0으로 대체
+    # 영양소 수치 데이터가 담긴 컬럼 리스트 정의
     numeric_columns = ["cal", "carbs", "protein", "fat", "sugar", "sodium"]
+    
+    # 수치 컬럼의 값을 숫자로 강제 변환하고, 변환 실패 또는 결측치(NaN)는 0.0으로 대체
     for column in numeric_columns:
         nutrition_df[column] = pd.to_numeric(nutrition_df[column], errors="coerce").fillna(0.0)
 
-    # 음식 이름을 키(Key)로 하고 영양 성분 딕셔너리를 값(Value)으로 하는 빠른 조회용 맵 반환
+    # 음식 이름을 키(Key)로 하고 각 영양 성분 딕셔너리를 값(Value)으로 매핑하여 빠른 조회용 맵 생성 및 반환
     return {
         row["food_name"]: {
             "category": row["category"],
@@ -118,16 +292,21 @@ def load_nutrition_db(csv_path, csv_modified_time):
         for _, row in nutrition_df.iterrows()
     }
 
-# 영양 데이터베이스 CSV 파일 경로 검증 및 로드 실행
-NUTRITION_CSV_PATH = os.path.join(os.path.dirname(__file__), "CaloDetect_nutrition_all_matched.csv")
+
+# 영양 데이터베이스 CSV 파일 경로 조합 및 존재 여부 검증
+NUTRITION_CSV_PATH = os.path.join(
+    os.path.dirname(__file__), 
+    "CaloDetect_nutrition_all_matched.csv"
+)
+
 if not os.path.exists(NUTRITION_CSV_PATH):
     raise FileNotFoundError(f"영양 데이터 CSV 파일이 없습니다: {NUTRITION_CSV_PATH}")
 
+# 영양 데이터 로드 함수 호출 (파일 수정 시각을 인자로 전달해 캐시 무효화 제어)
 NUTRITION_DB = load_nutrition_db(
     NUTRITION_CSV_PATH,
     os.path.getmtime(NUTRITION_CSV_PATH)
 )
-
 
 # [4] 5차 비전 AI 모델 로드 및 추론 함수
 @st.cache_resource  # 두 모델은 메모리에 한 번만 로드하고 재사용하도록 캐싱 처리
@@ -319,23 +498,40 @@ def run_5th_model(image, conf_val=0.08, iou_val=0.45, imgsz_val=960):
 
 # [5] 가상 데이터 생성 및 세션 상태 초기화 함수
 def generate_mock_meals(count=20):
+    # 영양 데이터베이스(NUTRITION_DB)에 등록된 모든 음식명(키)들을 리스트로 추출
     sample_keys = list(NUTRITION_DB.keys())
+    
+    # 생성된 가상 식단 데이터들을 담을 빈 리스트 초기화
     mock_data = []
+    
+    # 가상 날짜 생성을 위한 기준 시점(현재 시간) 객체 생성
     base_date = datetime.now()
     
+    # 요청받은 개수(count)만큼 반복하여 가상 식단 데이터 생성
     for _ in range(count):
-        # 최근 6일 이내의 랜덤 날짜 및 식사 시간 생성
+        # 최근 6일 이내의 무작위 날짜 지정을 위한 일수(0~6일) 랜덤 선택 후 기준일에서 차감
         target_date = base_date - timedelta(days=random.randint(0, 6))
+        
+        # 아침, 점심, 저녁, 간식/야식 중 하나의 식사 구분을 무작위로 선택
         meal_type = random.choice(["아침", "점심", "저녁", "간식/야식"])
+        
+        # 식사 시간 지정을 위한 시(7시~21시)와 분(10분~55분)을 무작위로 추출
         hour = random.randint(7, 21)
         minute = random.randint(10, 55)
+        
+        # 날짜와 시간을 보기 편한 문자열 포맷("YYYY-MM-DD HH:MM")으로 조합
         time_str = f"{target_date.strftime('%Y-%m-%d')} {hour:02d}:{minute:02d}"
         
+        # 등록된 음식들 중 무작위로 하나를 선택하여 음식명으로 지정
         food_name = random.choice(sample_keys)
-        item = NUTRITION_DB[food_name]
-        portion = random.choice([0.5, 1.0, 1.0, 1.5]) # 섭취 배율 무작위 설정
         
-        # 가상 데이터 딕셔너리 구성 (영양 성분 비례 계산)
+        # 선택된 음식의 영양 성분 정보 딕셔너리 가져오기
+        item = NUTRITION_DB[food_name]
+        
+        # 섭취 배율(0.5인분, 1인분, 1.5인분 등)을 무작위로 설정
+        portion = random.choice([0.5, 1.0, 1.0, 1.5])
+        
+        # 가상 데이터 딕셔너리 구성 (섭취 배율을 곱해 영양 성분 비례 계산)
         mock_data.append({
             "데이터구분": "가상생성",
             "기록일시": time_str,
@@ -350,70 +546,116 @@ def generate_mock_meals(count=20):
             "당류(g)": round(item["sugar"] * portion, 1),
             "나트륨(mg)": int(item["sodium"] * portion)
         })
+        
+    # 생성된 가상 식단 데이터를 기록일시 기준 최신순(내림차순)으로 정렬
     mock_data.sort(key=lambda x: x["기록일시"], reverse=True)
+    
     return mock_data
 
-# 앱 최초 실행 시 세션 상태에 가상 식단 20건 자동 주입
-if "initialized" not in st.session_state:
-    st.session_state.meal_history = generate_mock_meals(20)
-    st.session_state.initialized = True
-elif "meal_history" not in st.session_state:
-    st.session_state.meal_history = []
 
+# 앱 최초 실행 여부를 확인하여 세션 상태에 가상 식단 20건 자동 주입
+if "initialized" not in st.session_state:
+    st.session_state.meal_history = generate_mock_meals(20)  # 가상 식단 20건 생성 후 세션에 저장
+    st.session_state.initialized = True                      # 초기화 완료 상태 플래그 설정
+elif "meal_history" not in st.session_state:
+    st.session_state.meal_history = []                       # 히스토리가 비어있을 경우 빈 리스트로 보정
+
+# UI 알림 메시지 관리를 위한 세션 상태 변수 초기화
 if "last_added_message" not in st.session_state:
     st.session_state.last_added_message = None
 
-
 # [6] 사이드바 네비게이션 및 파라미터 조절 위젯 구성
-st.sidebar.markdown('<div class="sidebar-brand">🥗 NutriVision</div><div class="sidebar-sub">AI 맞춤형 식단 분석 서비스</div>', unsafe_allow_html=True)
+
+# 사이드바 상단에 서비스 브랜드명 및 서브타이틀 HTML 마크다운 렌더링
+st.sidebar.markdown(
+    '<div class="sidebar-brand">🥗 NutriVision</div><div class="sidebar-sub">AI 맞춤형 식단 분석 서비스</div>', 
+    unsafe_allow_html=True
+)
+
+# 사이드바 화면 전환 모드 선택 섹션 제목 출력
 st.sidebar.markdown("### 화면")
-view_mode = st.sidebar.radio("화면 모드", ["📷 음식 사진 분석 및 추가", "📊 종합 통계 대시보드"])
 
-st.sidebar.write("---")
-st.sidebar.subheader("⚙️ AI 5차 모델 탐지 설정")
-conf_threshold = st.sidebar.slider("AI 감지 신뢰도(Conf) 기준", 0.01, 0.40, 0.08, 0.01, help="낮출수록 더 많은 음식을 민감하게 찾아냅니다.")
-iou_threshold = st.sidebar.slider("중복 제거(IoU) 기준", 0.20, 0.70, 0.45, 0.05, help="인접한 반찬이 지워지지 않도록 조정합니다.")
-imgsz_choice = st.sidebar.select_slider("분석 해상도(imgsz)", options=[512,640, 800, 960, 1024, 1280], value=960, help="해상도가 클수록 작은 반찬을 선명하게 감지합니다.")
+# 사진 분석 화면과 종합 통계 대시보드 화면을 전환할 수 있는 라디오 버튼 위젯 생성
+view_mode = st.sidebar.radio(
+    "화면 모드", 
+    ["📷 음식 사진 분석 및 추가", "📊 종합 통계 대시보드"]
+)
 
+# UI 시각적 구분을 위한 수평선(구분선) 추가
 st.sidebar.write("---")
+
+# [수정] 사이드바에 있던 AI 탐지 설정 슬라이더 위젯들을 모두 제거했습니다.
+# 대신 아래 메인 화면 영역에서 고정된 파라미터 변수로 직접 선언합니다.
+
+# 사이드바 내 테스트용 가상 데이터 관리 섹션 소제목 출력
 st.sidebar.subheader("🎲 가상 데이터 관리")
-mock_count = st.sidebar.slider("추가할 가상 데이터 수", 5, 30, 10, 5)
 
+# 일괄 생성할 가상 식단 데이터 개수 조절 슬라이더 (기본값: 10건)
+mock_count = st.sidebar.slider(
+    "추가할 가상 데이터 수", 
+    5, 30, 10, 5
+)
+
+# 가상 식단 데이터 추가 생성 버튼 클릭 시 동작 로직
 if st.sidebar.button("✨ 가상 식단 데이터 추가 생성"):
     st.session_state.meal_history.extend(generate_mock_meals(mock_count))
     st.session_state.meal_history.sort(key=lambda x: x["기록일시"], reverse=True)
     st.sidebar.success(f"{mock_count}건의 식단이 추가되었습니다!")
     st.rerun()
 
+# 전체 식단 데이터 초기화(비우기) 버튼 클릭 시 동작 로직
 if st.sidebar.button("🗑️ 전체 데이터 비우기"):
     st.session_state.meal_history = []
     st.session_state.last_added_message = None
     st.sidebar.warning("데이터가 모두 삭제되었습니다.")
     st.rerun()
 
-daily_goal = st.sidebar.number_input("🎯 1일 목표 칼로리 (kcal)", 1200, 3500, 2000, 100)
-
+# 대시보드 통계 기준이 되는 사용자 1일 목표 칼로리 입력 숫자 필드 위젯 (기본값: 2000 kcal)
+daily_goal = st.sidebar.number_input(
+    "🎯 1일 목표 칼로리 (kcal)", 
+    1200, 3500, 2000, 100
+)
 
 # [7] 화면 1: 다중 사진 분석 및 5차 모델 음식 감지 인터페이스
 if view_mode == "📷 음식 사진 분석 및 추가":
+    
+    # 화면 최상단 메인 타이틀 출력
     st.title("📷 AI 5차 모델 다중 음식 감지 & 식단 등록")
-    st.caption("🟢 초록색: 5차 59종 한식")
+    
+    # [추가] 사이드바가 사라진 대신, 확정된 AI 탐지 파라미터 기준을 사용자에게 안내하는 캡션 출력
+    st.caption("🟢 5차 59종 한식 탐지 | ⚙️ **탐지 기준 고정**: 신뢰도(Conf) 0.11 · 중복제거(IoU) 0.45 · 해상도(imgsz) 960")
 
+    # [수정] 요청하신 AI 탐지 파라미터 고정값 정의
+    conf_threshold = 0.11
+    iou_threshold = 0.45
+    imgsz_choice = 960
+
+    # 최근 일괄 등록 성공 내역이 세션에 존재할 경우 상단에 성공 알림 메시지 노출
     if st.session_state.last_added_message:
         st.success(st.session_state.last_added_message)
+        
+        # 알림 닫기 버튼 클릭 시 메시지 상태를 초기화하고 화면 새로고침
         if st.button("알림 닫기"):
             st.session_state.last_added_message = None
             st.rerun()
 
-    input_source = st.radio("이미지 입력 방식:", ["📂 시연용 샘플 이미지 선택", "💻 내 컴퓨터에서 업로드"], horizontal=True)
+    # 이미지 입력 방식을 선택하는 라디오 버튼 위젯 생성
+    input_source = st.radio(
+        "이미지 입력 방식:", 
+        ["📂 시연용 샘플 이미지 선택", "💻 내 컴퓨터에서 업로드"], 
+        horizontal=True
+    )
     
     images_to_process = []
     sample_dir = "samples"
     
+    # [방식 1] 시연용 샘플 이미지 폴더에서 파일을 선택하여 처리하는 경우
     if input_source == "📂 시연용 샘플 이미지 선택":
         if not os.path.exists(sample_dir):
             os.makedirs(sample_dir)
+            
         sample_files = [f for f in os.listdir(sample_dir) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+        
         if sample_files:
             selected_samples = st.multiselect("샘플 사진을 선택하세요:", options=sample_files, default=[sample_files[0]])
             for file_name in selected_samples:
@@ -421,58 +663,97 @@ if view_mode == "📷 음식 사진 분석 및 추가":
                 images_to_process.append((file_name, Image.open(img_path).convert("RGB")))
         else:
             st.info("💡 `samples/` 폴더에 사진들을 넣어두면 간편하게 선택할 수 있습니다.")
+            
+    # [방식 2] 사용자의 로컬 컴퓨터에서 이미지 파일을 직접 업로드하는 경우
     else:
-        uploaded_files = st.file_uploader("음식 사진을 선택하세요 (여러 장 가능)", type=["jpg", "png", "jpeg"], accept_multiple_files=True)
+        uploaded_files = st.file_uploader(
+            "음식 사진을 선택하세요 (여러 장 가능)", 
+            type=["jpg", "png", "jpeg"], 
+            accept_multiple_files=True
+        )
+        
         if uploaded_files:
             for up_file in uploaded_files:
                 images_to_process.append((up_file.name, Image.open(up_file).convert("RGB")))
 
+    # 처리할 이미지가 하나 이상 존재할 경우 분석 및 UI 렌더링 진행
     if images_to_process:
         st.write("---")
-        global_meal_slot = st.selectbox("🕒 식사 구분 (일괄 적용)", ["아침", "점심", "저녁", "간식/야식"], index=1)
-        staged_records = []
+        
+        global_meal_slot = st.selectbox(
+            "🕒 식사 구분 (일괄 적용)", 
+            ["아침", "점심", "저녁", "간식/야식"], 
+            index=1
+        )
+        
+        staged_records = []  # 최종 등록 대기 중인 식단 영양 기록들을 담을 임시 리스트
         
         for img_idx, (img_title, img_obj) in enumerate(images_to_process):
             st.markdown(f"### 🖼️ [사진 {img_idx+1}] {img_title}")
             
-            # 비전 AI 객체 탐지 실행
-            detected_items, annotated_img = run_5th_model(
-                img_obj,
-                conf_val=conf_threshold,
-                iou_val=iou_threshold,
-                imgsz_val=imgsz_choice
-            )
+            # 고정된 파라미터 값들이 반영된 고유 세션 키 생성
+            session_key_orig = f"orig_items_{img_idx}_{img_title}_{conf_threshold}_{iou_threshold}_{imgsz_choice}"
+            session_key_active = f"active_items_{img_idx}_{img_title}_{conf_threshold}_{iou_threshold}_{imgsz_choice}"
+            annotated_key = f"annotated_img_{img_idx}_{img_title}_{conf_threshold}_{iou_threshold}_{imgsz_choice}"
+            
+            # 세션에 캐시된 데이터가 없을 경우에만 확정된 고정값으로 YOLO 모델 추론 수행
+            if session_key_orig not in st.session_state:
+                detected_items, annotated_img = run_5th_model(
+                    img_obj,
+                    conf_val=conf_threshold,
+                    iou_val=iou_threshold,
+                    imgsz_val=imgsz_choice
+                )
+                st.session_state[session_key_orig] = [dict(item) for item in detected_items]
+                st.session_state[session_key_active] = [dict(item) for item in detected_items]
+                st.session_state[annotated_key] = annotated_img
+            
+            orig_items = st.session_state[session_key_orig]
+            active_items = st.session_state[session_key_active]
+            annotated_img = st.session_state[annotated_key]
 
-            col_img, col_summary = st.columns([1.3, 1], gap="medium")
+            # 컬럼 비율을 [1, 1]로 균형 있게 잡고 gap 설정
+            col_img, col_summary = st.columns([1, 1], gap="small")
+            
             with col_img:
-                st.image(annotated_img, caption="🎯 AI 5차 모델 객체 탐색 결과", use_container_width=True)
+                # AI 탐색 결과 이미지 출력 크기 고정 (width=350)
+                st.image(annotated_img, caption="🎯 AI 5차 모델 객체 탐색 결과", width=350)
+                
             with col_summary:
+                # 1차 탐색 요약 영역
                 st.markdown("#### 🔍 1차 탐색 요약")
-                if not detected_items:
-                    st.warning("⚠️ 사진에서 인식된 음식이 없습니다. 사이드바의 감도 기준을 낮추거나 아래에서 수동으로 선택해 주세요.")
+                
+                if not orig_items:
+                    st.warning("⚠️ 사진에서 인식된 음식이 없습니다. (사진에 관계없이 직접추가도 가능합니다)")
                 else:
-                    st.success(f"총 **{len(detected_items)}개**의 음식을 발견했습니다!")
-                    tags = [f"**{it['name']}** ({it['conf']:.0f}%)" for it in detected_items]
+                    st.success(f"총 **{len(orig_items)}개**의 음식을 발견했습니다! 탐지 된 음식 중 맞지 않는 음식은 삭제버튼으로 삭제 가능합니다.")
+                    
+                    tags = [f"**{it['name']}** ({it['conf']:.0f}%)" for it in orig_items]
                     st.markdown("발견된 음식: " + " · ".join(tags))
                     
-                    thumb_cols = st.columns(min(len(detected_items), 4))
-                    for t_idx, it in enumerate(detected_items[:4]):
+                    thumb_cols = st.columns(min(len(orig_items), 4))
+                    for t_idx, it in enumerate(orig_items[:4]):
                         with thumb_cols[t_idx]:
                             if it["crop"]:
-                                st.image(it["crop"], caption=it["name"], use_container_width=True)
+                                st.image(it["crop"], caption=it["name"], width=150)
 
+            # 각 음식별 상세 메뉴 및 섭취량 조절 패널 (활성 리스트 기준 상호작용)
             with st.expander("✏️ 각 음식별 상세 메뉴 및 섭취량 조절", expanded=True):
                 all_foods = list(NUTRITION_DB.keys())
                 
-                if not detected_items:
+                if not active_items:
                     food_key = st.selectbox(
                         "메뉴 수동 선택",
                         options=all_foods,
                         format_func=lambda k: f"{k} ({NUTRITION_DB[k]['category']})",
-                        key=f"manual_{img_idx}"
+                        key=f"manual_{img_idx}_{img_title}"
                     )
                     item = NUTRITION_DB[food_key]
-                    portion = st.number_input(f"섭취 수량 ({item['unit']})", min_value=0.5, max_value=5.0, value=1.0, step=0.5, key=f"p_man_{img_idx}")
+                    portion = st.number_input(
+                        f"섭취 수량 ({item['unit']})", 
+                        min_value=0.5, max_value=5.0, value=1.0, step=0.5, 
+                        key=f"p_man_{img_idx}_{img_title}"
+                    )
                     
                     staged_records.append({
                         "데이터구분": "직접입력", "식사구분": global_meal_slot, "음식명": food_key,
@@ -485,40 +766,66 @@ if view_mode == "📷 음식 사진 분석 및 추가":
                         "나트륨(mg)": int(item["sodium"] * portion)
                     })
                 else:
-                    for it_idx, it in enumerate(detected_items):
-                        c_crop, c_detail = st.columns([1, 3])
-                        with c_crop:
-                            if it["crop"]:
-                                st.image(it["crop"], caption=f"#{it_idx+1} {it['name']}", use_container_width=True)
+                    for it_idx, it in enumerate(list(active_items)):
+                        c_detail, c_del = st.columns([4, 1])
+                        
                         with c_detail:
-                            def_idx = all_foods.index(it["name"]) if it["name"] in all_foods else 0
-                            sel_food = st.selectbox(
-                                f"#{it_idx+1} 메뉴 확인/수정",
-                                options=all_foods,
-                                index=def_idx,
-                                format_func=lambda k: f"{k} ({NUTRITION_DB[k]['category']})",
-                                key=f"menu_{img_idx}_{it_idx}"
-                            )
-                            item = NUTRITION_DB[sel_food]
-                            portion = st.number_input(
-                                f"수량 ({item['unit']})",
-                                min_value=0.5, max_value=5.0, value=1.0, step=0.5,
-                                key=f"portion_{img_idx}_{it_idx}"
-                            )
+                            c_crop, c_select = st.columns([1, 2.5])
                             
-                            c_cal = round(item["cal"] * portion, 1)
-                            st.caption(f"🔥 **{c_cal} kcal** | 탄 {round(item['carbs']*portion, 1)}g | 단 {round(item['protein']*portion, 1)}g | 지 {round(item['fat']*portion, 1)}g | 나트륨 {int(item['sodium']*portion)}mg")
+                            with c_crop:
+                                if it["crop"]:
+                                    st.image(it["crop"], caption=f"#{it_idx+1} {it['name']}", width=150)
+                                    
+                            with c_select:
+                                def_idx = all_foods.index(it["name"]) if it["name"] in all_foods else 0
+                                
+                                sel_food = st.selectbox(
+                                    f"#{it_idx+1} 메뉴 확인/수정",
+                                    options=all_foods,
+                                    index=def_idx,
+                                    format_func=lambda k: f"{k} ({NUTRITION_DB[k]['category']})",
+                                    key=f"menu_{img_idx}_{img_title}_{it_idx}"
+                                )
+                                
+                                item = NUTRITION_DB[sel_food]
+                                
+                                portion = st.number_input(
+                                    f"수량 ({item['unit']})",
+                                    min_value=0.5, max_value=5.0, value=1.0, step=0.5,
+                                    key=f"portion_{img_idx}_{img_title}_{it_idx}"
+                                )
+                                
+                                c_cal = round(item["cal"] * portion, 1)
+                                
+                                st.markdown(
+                                    f"<div style='font-size: 15px; font-weight: 600; color: #16324F; margin-top: 5px;'>"
+                                    f"🔥 {c_cal:,.1f} kcal | 탄 {round(item['carbs']*portion, 1)}g | "
+                                    f"단 {round(item['protein']*portion, 1)}g | 지 {round(item['fat']*portion, 1)}g | "
+                                    f"나트륨 {int(item['sodium']*portion)}mg"
+                                    f"</div>",
+                                    unsafe_allow_html=True
+                                )
+                                
+                                staged_records.append({
+                                    "데이터구분": "직접입력", "식사구분": global_meal_slot, "음식명": sel_food,
+                                    "섭취수량": f"{portion} {item['unit']}",
+                                    "칼로리(kcal)": c_cal,
+                                    "탄수화물(g)": round(item["carbs"] * portion, 1),
+                                    "단백질(g)": round(item["protein"] * portion, 1),
+                                    "지방(g)": round(item["fat"] * portion, 1),
+                                    "당류(g)": round(item["sugar"] * portion, 1),
+                                    "나트륨(mg)": int(item["sodium"] * portion)
+                                })
+                                
+                        with c_del:
+                            st.write("") 
+                            st.write("")
+                            st.write("")
                             
-                            staged_records.append({
-                                "데이터구분": "직접입력", "식사구분": global_meal_slot, "음식명": sel_food,
-                                "섭취수량": f"{portion} {item['unit']}",
-                                "칼로리(kcal)": c_cal,
-                                "탄수화물(g)": round(item["carbs"] * portion, 1),
-                                "단백질(g)": round(item["protein"] * portion, 1),
-                                "지방(g)": round(item["fat"] * portion, 1),
-                                "당류(g)": round(item["sugar"] * portion, 1),
-                                "나트륨(mg)": int(item["sodium"] * portion)
-                            })
+                            if st.button("🗑️ 삭제", key=f"del_{img_idx}_{img_title}_{it_idx}"):
+                                active_items.pop(it_idx)
+                                st.rerun()
+                                
                         st.write("---")
 
         if staged_records:
@@ -543,7 +850,6 @@ if view_mode == "📷 음식 사진 분석 및 추가":
                 )
                 st.rerun()
 
-
 # [8] ECharts 공통 테마 및 렌더링 헬퍼 함수 설정
 ECHARTS_TEXT = "#40515F"
 ECHARTS_MUTED = "#82909A"
@@ -557,7 +863,6 @@ def render_echart(options, height="330px", key=None):
         height=height,
         key=key
     )
-
 
 # [9] 화면 2: 고급 건강검진형 종합 통계 대시보드
 if view_mode == "📊 종합 통계 대시보드":
